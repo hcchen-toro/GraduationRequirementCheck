@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v14.0 完整修復版)</title>
+    <title>東海電機畢業學分審查系統 (v15.0 穩定版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { 
@@ -36,7 +36,6 @@
 
         button.btn { padding: 10px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.2s; }
         button.btn:hover { background-color: #003366; }
-        button.btn-print { background-color: #6c757d; margin-left: 10px; }
         button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; }
 
         /* 儀表板 */
@@ -82,7 +81,7 @@
         #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
 
-        /* 列印樣式 (新增) */
+        /* 列印樣式 */
         @media print {
             .control-panel, .status-bar, .back-to-top, .btn, #admin-panel { display: none !important; }
             .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
@@ -98,7 +97,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v14.0)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v15.0 穩定版)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -325,30 +324,26 @@
         }
     }
 
-    // --- 3. 檔案讀取 (修復核心：正確處理 Binary String) ---
+    // --- 3. 檔案讀取 (修復核心：通用 SheetJS 讀取 + 安全 DOM 操作) ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
         if (!file) { alert("請先選擇檔案！"); return; }
 
         const reader = new FileReader();
-        const fname = file.name.toLowerCase();
-
+        
         reader.onload = function(e) {
             try {
-                if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
-                    // 修復：使用 Uint8Array 確保 SheetJS 能正確讀取 ArrayBuffer
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
-                    parsedStudentData = normalizeData(jsonData);
-                } else {
-                    // CSV 處理: 雖然是 ArrayBuffer 但需轉回文字
-                    const textDecoder = new TextDecoder("utf-8"); // 假設是 UTF-8
-                    const text = textDecoder.decode(e.target.result);
-                    parsedStudentData = parseCSV(text);
-                }
+                const data = new Uint8Array(e.target.result);
+                // 強制使用 SheetJS 讀取所有格式 (包含 CSV)，解決編碼問題
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                if (!sheetName) throw new Error("Excel/CSV 檔案中找不到工作表");
+                
+                // 讀取並轉換為 JSON
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+                
+                parsedStudentData = normalizeData(jsonData);
                 
                 // 資料前處理：去重複 (取最高分)
                 parsedStudentData = deduplicateData(parsedStudentData);
@@ -360,68 +355,46 @@
             }
         };
 
-        // 統一使用 ArrayBuffer 讀取，相容性最好 (修正原本文字讀取的錯誤)
+        // 統一使用 ArrayBuffer 讀取
         reader.readAsArrayBuffer(file); 
     }
 
     function normalizeData(jsonData) {
-        return jsonData.map(row => ({
-            year: String(row['學年度'] || row['year'] || "").trim(),
-            sem: String(row['學期'] || row['semester'] || "").trim(),
-            code: String(row['選課代號'] || row['code'] || "").trim(),
-            name: String(row['科目名稱'] || row['name'] || "").trim(),
-            credit: parseFloat(row['學分'] || row['credits'] || 0),
-            gpa: String(row['GPA'] || row['gpa'] || "").trim()
-        })).filter(item => item.name); // 過濾掉空行
-    }
-
-    function parseCSV(text) {
-        const lines = text.split('\n');
-        const result = [];
-        // 簡單判斷是否有標題列
-        let startIndex = 0;
-        if (lines[0].includes("學期") || lines[0].toLowerCase().includes("semester")) {
-            startIndex = 1;
-        }
-
-        for (let i = startIndex; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if(!line) continue;
-            const cols = line.split(',');
-            if (cols.length >= 6) {
-                result.push({
-                    year: cols[0].trim(),
-                    sem: cols[1].trim(),
-                    code: cols[2].trim(),
-                    name: cols[3].trim(),
-                    credit: parseFloat(cols[4]),
-                    gpa: cols[5].trim()
-                });
+        return jsonData.map(rawRow => {
+            // 清理欄位名稱 (去除空白)
+            const row = {};
+            for (let k in rawRow) {
+                row[k.trim()] = rawRow[k];
             }
-        }
-        return result;
+
+            return {
+                year: String(row['學年度'] || row['year'] || "").trim(),
+                sem: String(row['學期'] || row['semester'] || "").trim(),
+                code: String(row['選課代號'] || row['code'] || "").trim(),
+                name: String(row['科目名稱'] || row['name'] || "").trim(),
+                credit: parseFloat(row['學分'] || row['credits'] || 0),
+                gpa: String(row['GPA'] || row['gpa'] || "").trim()
+            };
+        }).filter(item => item.name); // 過濾掉空行
     }
 
-    // --- 3.1 去重複邏輯 (新功能) ---
+    // --- 3.1 去重複邏輯 ---
     function deduplicateData(data) {
         const map = new Map();
 
         data.forEach(item => {
             const normName = normalizeName(item.name);
-            const key = normName; // 以標準化課名為鍵
+            const key = normName; 
             
             const itemPoint = getGradePoint(item.gpa);
             
             if (map.has(key)) {
                 const exist = map.get(key);
                 const existPoint = getGradePoint(exist.gpa);
-                
-                // 邏輯：保留成績較高的那一次 (例如重修過)
+                // 保留成績較高的，若相同保留較新的
                 if (itemPoint > existPoint) {
                     map.set(key, item);
-                } 
-                // 若成績相同，保留較新的 (學年+學期比較)
-                else if (itemPoint === existPoint) {
+                } else if (itemPoint === existPoint) {
                     const itemSemVal = parseInt(item.year)*10 + (item.sem==='上'?1:2);
                     const existSemVal = parseInt(exist.year)*10 + (exist.sem==='上'?1:2);
                     if (itemSemVal > existSemVal) map.set(key, item);
@@ -431,7 +404,6 @@
             }
         });
 
-        // 轉回陣列並依照學年學期排序
         return Array.from(map.values()).sort((a,b) => {
              const va = parseInt(a.year)*10 + (a.sem==='上'?1:2);
              const vb = parseInt(b.year)*10 + (b.sem==='上'?1:2);
@@ -475,7 +447,10 @@
     }
 
     function analyze() {
-        if (parsedStudentData.length === 0) return;
+        if (parsedStudentData.length === 0) {
+            alert("讀取到的資料為空，請確認檔案內容格式是否正確。");
+            return;
+        }
 
         const year = document.getElementById('admissionYear').value;
         const rule = RULES[year];
@@ -494,14 +469,12 @@
         let lists = { basic: [], req: [], deptElec: [], deptElecLab: [], genElec: [], genEd: [], fail: [] };
         let reqCheckList = rule.required.map(r => ({ name: r, matched: false, log: null }));
         
-        // GPA 計算變數
         let totalPoints = 0;
         let totalGpaCredits = 0;
 
         parsedStudentData.forEach(rec => {
             const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '抵免', '通過'];
             
-            // 計算 GPA (排除抵免、通過、及格不計分等)
             const pts = getGradePoint(rec.gpa);
             if (pts >= 0) { 
                 totalPoints += pts * rec.credit;
@@ -509,7 +482,6 @@
             }
 
             if (!passGrades.includes(rec.gpa)) {
-                // 不及格
                 lists.fail.push(rec);
                 return;
             }
@@ -538,7 +510,6 @@
                         if (isGeneralEd(rec.name)) cat = "GenEd";
                         else {
                             const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
-                            // 排除特定必修名字像實驗的
                             const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("電子學") || rec.name.includes("實務探索");
                             
                             if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
@@ -566,18 +537,20 @@
             else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
         });
 
-        // 計算最終 GPA
         const finalGpa = totalGpaCredits > 0 ? (totalPoints / totalGpaCredits).toFixed(2) : "0.00";
 
         updateDashboard(stats, target, reqCheckList, finalGpa, totalGpaCredits);
         renderTables(lists, reqCheckList);
     }
 
-    // --- 5. 更新儀表板 ---
+    // --- 5. 更新儀表板 (已修復 Crash 問題) ---
     function updateDashboard(stats, target, reqCheckList, gpa, gpaCount) {
         document.getElementById('result-section').classList.remove('hidden');
 
+        // 更新各個卡片 (加入 null check 防止崩潰)
         updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
+        
+        // 基礎詳細
         const d = stats.basic.details;
         const basicText = `
             中文: ${d.chi}/2 ${d.chi>=2?'✔':'❌'} | 英文: ${d.eng}/4 ${d.eng>=4?'✔':'❌'}<br>
@@ -628,13 +601,22 @@
         document.getElementById('genElecCred').innerText = stats.genElec.cred;
     }
 
+    // 安全更新卡片的函數 (修正重點)
     function updateCard(id, current, target, count, totalCount) {
-        document.getElementById(`${id}Cred`).innerText = current;
-        document.getElementById(`${id}Count`).innerText = count;
-        if(totalCount) document.getElementById(`${id}TotalCount`).innerText = totalCount;
+        // 1. 安全檢查元素是否存在，避免 null error
+        const credEl = document.getElementById(`${id}Cred`);
+        if (credEl) credEl.innerText = current;
+
+        const countEl = document.getElementById(`${id}Count`);
+        if (countEl) countEl.innerText = count;
+
+        if (totalCount !== undefined) {
+            const totalEl = document.getElementById(`${id}TotalCount`);
+            if (totalEl) totalEl.innerText = totalCount;
+        }
 
         const statEl = document.getElementById(`${id}Status`);
-        if (id !== 'basic') {
+        if (statEl && id !== 'basic') {
             const isPass = current >= target;
             statEl.className = `dash-status ${isPass ? 'status-ok' : 'status-ng'}`;
             statEl.innerText = isPass ? "已完成" : "未完成";
