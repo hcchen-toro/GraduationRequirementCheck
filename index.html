@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v18.0 通識領域版)</title>
+    <title>東海電機畢業學分審查系統 (by HC)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { 
@@ -17,8 +17,11 @@
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 30px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 10px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
         
+        /* 新增：學生問候語樣式 */
+        .student-greeting { text-align: center; font-size: 14px; color: #666; margin-bottom: 25px; height: 20px; }
+
         /* 狀態列 */
         .status-bar { background: #e9ecef; padding: 10px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
         .status-ready { color: var(--success-color); font-weight: bold; }
@@ -82,6 +85,38 @@
         }
         .back-to-top:hover { text-decoration: underline; }
 
+        /* 新增：缺漏項目總結區塊 */
+        #missing-summary-panel {
+            margin-top: 50px;
+            background-color: #fff5f5;
+            border: 2px solid #ffcccc;
+            border-radius: 10px;
+            padding: 25px;
+        }
+        #missing-summary-panel h3 {
+            color: #d63384;
+            margin-top: 0;
+            border-bottom: 2px solid #ffcccc;
+            padding-bottom: 10px;
+        }
+        .missing-item {
+            color: #c0392b;
+            margin-bottom: 8px;
+            font-size: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .missing-item::before {
+            content: "⚠️";
+            margin-right: 10px;
+        }
+        .congrats-msg {
+            color: var(--success-color);
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+        }
+
         /* 管理者面板 */
         #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
@@ -93,16 +128,19 @@
             body { background: white; -webkit-print-color-adjust: exact; }
             .dash-card { border: 1px solid #999; break-inside: avoid; }
             h1 { font-size: 24px; margin-bottom: 10px; }
+            .student-greeting { display: block !important; margin-bottom: 20px; font-weight: bold; color: #000; }
             .category-header { margin-top: 30px; page-break-after: avoid; }
             table { page-break-inside: auto; }
             tr { page-break-inside: avoid; page-break-after: auto; }
+            #missing-summary-panel { border: 2px solid #333; }
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v18.0 通識領域版)</span></h1>
+    <h1>東海電機 畢業學分審查系統</h1>
+    <div id="greetingDisplay" class="student-greeting"></div>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -137,8 +175,8 @@
             </div>
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援格式：.xlsx, .xls, .csv。<br>
-                <strong>更新：</strong>加入通識人文/社會/自然指標；有機化學/普通化學歸類為外系選修。
+                支援格式：.xlsx, .csv (檔名將作為稱呼)。<br>
+                <strong>更新：</strong>最下方新增「缺漏項目總結」；保留所有修復規則。
             </div>
         </div>
     </div>
@@ -206,6 +244,11 @@
         </div>
 
         <div id="tables-container"></div>
+        
+        <div id="missing-summary-panel">
+            <h3>📝 溫馨提醒：目前缺少項目總結</h3>
+            <div id="missing-content"></div>
+        </div>
     </div>
 
     <div id="admin-panel">
@@ -259,24 +302,9 @@
     ];
 
     const SOFT_LABS = ["工程數學軟體實習", "電子電路軟體實習", "系統軟體實習"];
-
-    // 這些課程強制歸類為「一般選修」
     const FORCE_GEN_ELEC_LIST = ["有機化學", "普通化學", "普通物理實驗"];
-
-    const DEPT_ELECTIVE_WHITELIST = [
-        "Python程式設計", 
-        "數位系統雛型設計", 
-        "機器學習", 
-        "資料結構", 
-        "奈米材料製造與量測技術", 
-        "生醫工程導論"
-    ];
-
-    const DEPT_KEYWORDS = [
-        "電子", "電機", "電路", "訊號", "系統", "半導體", "晶片", "控制", 
-        "通訊", "邏輯", "微處理", "程式", "物件導向", "演算法", "人工智慧", 
-        "深度學習", "積體電路", "光電", "電磁", "微波", "天線"
-    ];
+    const DEPT_ELECTIVE_WHITELIST = ["Python程式設計", "數位系統雛型設計", "機器學習", "資料結構", "奈米材料製造與量測技術", "生醫工程導論"];
+    const DEPT_KEYWORDS = ["電子", "電機", "電路", "訊號", "系統", "半導體", "晶片", "控制", "通訊", "邏輯", "微處理", "程式", "物件導向", "演算法", "人工智慧", "深度學習", "積體電路", "光電", "電磁", "微波", "天線"];
 
     const RULES = {
         "111": { basic: BASE_BASIC_COURSES, required: [...CORE_REQUIRED_COURSES, ...SOFT_LABS] },
@@ -285,13 +313,7 @@
         "114": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES }
     };
 
-    // GPA 對照表 (東海制)
-    const GRADE_POINTS = {
-        "A+": 4.3, "A": 4.0, "A-": 3.7,
-        "B+": 3.3, "B": 3.0, "B-": 2.7,
-        "C+": 2.3, "C": 2.0, "C-": 1.7,
-        "D": 1.0, "E": 0, "F": 0, "X": 0
-    };
+    const GRADE_POINTS = { "A+": 4.3, "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7, "C+": 2.3, "C": 2.0, "C-": 1.7, "D": 1.0, "E": 0, "F": 0, "X": 0 };
 
     let parsedStudentData = [];
     let exceptionMap = {}; 
@@ -325,7 +347,7 @@
             dbStatus.innerText = `✅ 系統就緒 (已載入 ${successCount} 個開課檔)`;
             dbStatus.className = "status-ready";
         } else {
-            dbStatus.innerText = "⚠️ 未偵測到開課檔 (將依賴名稱規則判斷)";
+            dbStatus.innerText = "⚠️ 未偵測到開課檔";
         }
     };
 
@@ -337,11 +359,16 @@
         }
     }
 
-    // --- 3. 檔案讀取 (相容 XLSX/CSV) ---
+    // --- 3. 檔案讀取 ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
         if (!file) { alert("請先選擇檔案！"); return; }
+
+        // 新增：讀取檔名並顯示問候語
+        const fileName = file.name.split('.')[0]; // 去除副檔名
+        const greetingEl = document.getElementById('greetingDisplay');
+        greetingEl.innerText = `👋 ${fileName} 你好`;
 
         const reader = new FileReader();
         
@@ -383,85 +410,48 @@
         }).filter(item => item.name);
     }
 
-    // --- 3.1 去重複邏輯 (Key = 課名 + 學期) ---
+    // --- 3.1 去重複邏輯 ---
     function deduplicateData(data) {
         const map = new Map();
-
         data.forEach(item => {
             const normName = normalizeName(item.name);
             const key = normName + "_" + item.sem; 
-            
             const itemPoint = getGradePoint(item.gpa);
-            
             if (map.has(key)) {
                 const exist = map.get(key);
                 const existPoint = getGradePoint(exist.gpa);
-                if (itemPoint > existPoint) {
-                    map.set(key, item);
-                } else if (itemPoint === existPoint) {
-                    const itemYear = parseInt(item.year);
-                    const existYear = parseInt(exist.year);
-                    if (itemYear > existYear) map.set(key, item);
+                if (itemPoint > existPoint) { map.set(key, item); }
+                else if (itemPoint === existPoint) {
+                    if (parseInt(item.year) > parseInt(exist.year)) map.set(key, item);
                 }
-            } else {
-                map.set(key, item);
-            }
+            } else { map.set(key, item); }
         });
-
-        return Array.from(map.values()).sort((a,b) => {
-             const va = parseInt(a.year)*10 + (a.sem==='上'?1:2);
-             const vb = parseInt(b.year)*10 + (b.sem==='上'?1:2);
-             return va - vb;
-        });
+        return Array.from(map.values()).sort((a,b) => (parseInt(a.year)*10+(a.sem==='上'?1:2)) - (parseInt(b.year)*10+(b.sem==='上'?1:2)));
     }
 
-    function getGradePoint(grade) {
-        return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1;
-    }
+    function getGradePoint(grade) { return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1; }
 
     // --- 4. 核心邏輯 ---
     function normalizeName(name) {
         if (!name) return "";
-        let s = name.trim();
-        s = s.replace(/\s+/g, "");
-        s = s.replace(/（/g, "(").replace(/）/g, ")");
-        s = s.replace(/〈/g, "(").replace(/〉/g, ")");
-        s = s.replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II");
-        return s;
+        return name.trim().replace(/\s+/g, "").replace(/（/g, "(").replace(/）/g, ")").replace(/〈/g, "(").replace(/〉/g, ")").replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II");
     }
 
     function isSameName(sName, rName) { return normalizeName(sName) === normalizeName(rName); }
-
-    function isBasicCourse(name, list) {
-        const n = normalizeName(name);
-        return list.some(b => n.includes(normalizeName(b)));
-    }
-
+    function isBasicCourse(name, list) { return list.some(b => normalizeName(name).includes(normalizeName(b))); }
     function isGeneralEd(name) {
-        // 更新：包含「文明」與「議題」
         const p = ["人文", "社會", "自然", "永續", "文明", "領導", "議題"];
         return p.some(pre => name.startsWith(pre + "：") || name.startsWith(pre + ":") || name.includes(pre + "領域") || name.startsWith(pre));
     }
-
-    function isForceGenElective(name) {
-        // 檢查是否為強制一般選修 (有機化學、普通化學等)
-        const n = normalizeName(name);
-        return FORCE_GEN_ELEC_LIST.some(f => n.includes(normalizeName(f)));
-    }
-
+    function isForceGenElective(name) { return FORCE_GEN_ELEC_LIST.some(f => normalizeName(name).includes(normalizeName(f))); }
     function isDeptElective(name, credit) {
         const n = normalizeName(name);
         if (DEPT_ELECTIVE_WHITELIST.some(w => n.includes(normalizeName(w)))) return true;
-        let hasKeyword = DEPT_KEYWORDS.some(k => n.includes(k));
-        if (credit >= 3 && hasKeyword) return true;
-        return false;
+        return (credit >= 3 && DEPT_KEYWORDS.some(k => n.includes(k)));
     }
 
     function analyze() {
-        if (parsedStudentData.length === 0) {
-            alert("讀取到的資料為空，請確認檔案內容格式是否正確。");
-            return;
-        }
+        if (parsedStudentData.length === 0) return alert("讀取到的資料為空。");
 
         const year = document.getElementById('admissionYear').value;
         const rule = RULES[year];
@@ -473,29 +463,21 @@
             deptElec: { cred: 0, count: 0 },
             deptElecLab: { cred: 0, count: 0 },
             genElec: { cred: 0, count: 0 },
-            genEd: { cred: 0, count: 0, domains: { hu: false, so: false, na: false } }, // 新增 domains
+            genEd: { cred: 0, count: 0, domains: { hu: false, so: false, na: false } },
             total: 0
         };
 
         let lists = { basic: [], req: [], deptElec: [], deptElecLab: [], genElec: [], genEd: [], fail: [] };
         let reqCheckList = rule.required.map(r => ({ name: r, matched: false, log: null }));
         
-        let totalPoints = 0;
-        let totalGpaCredits = 0;
+        let totalPoints = 0, totalGpaCredits = 0;
 
         parsedStudentData.forEach(rec => {
             const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '抵免', '通過'];
-            
             const pts = getGradePoint(rec.gpa);
-            if (pts >= 0) { 
-                totalPoints += pts * rec.credit;
-                totalGpaCredits += rec.credit;
-            }
+            if (pts >= 0) { totalPoints += pts * rec.credit; totalGpaCredits += rec.credit; }
 
-            if (!passGrades.includes(rec.gpa)) {
-                lists.fail.push(rec);
-                return;
-            }
+            if (!passGrades.includes(rec.gpa)) { lists.fail.push(rec); return; }
 
             let cat = "Unknown";
             const normName = normalizeName(rec.name);
@@ -503,9 +485,7 @@
             if (exceptionMap[normName]) {
                 cat = exceptionMap[normName];
                 if (cat === 'Required') {
-                    for (let r of reqCheckList) {
-                        if (!r.matched && isSameName(rec.name, r.name)) { r.matched = true; r.log = rec; break; }
-                    }
+                    for (let r of reqCheckList) { if (!r.matched && isSameName(rec.name, r.name)) { r.matched = true; r.log = rec; break; } }
                 }
             } 
             else {
@@ -518,17 +498,11 @@
                         }
                     }
                     if (!matched) {
-                        if (isGeneralEd(rec.name)) {
-                            cat = "GenEd";
-                        }
-                        else if (isForceGenElective(rec.name)) {
-                            // 新增判定：若是普通化學、有機化學等，直接歸類為一般選修
-                            cat = "GeneralElective";
-                        }
+                        if (isGeneralEd(rec.name)) cat = "GenEd";
+                        else if (isForceGenElective(rec.name)) cat = "GeneralElective";
                         else {
                             const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
                             const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("電子學") || rec.name.includes("實務探索");
-                            
                             if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
                             else if (isDeptElective(rec.name, rec.credit)) cat = "DeptElective";
                             else cat = "GeneralElective";
@@ -539,9 +513,7 @@
 
             stats.total += rec.credit;
             if (cat === "Basic") { 
-                lists.basic.push(rec); 
-                stats.basic.cred += rec.credit; 
-                stats.basic.count++;
+                lists.basic.push(rec); stats.basic.cred += rec.credit; stats.basic.count++;
                 if (rec.name.includes("中文")) stats.basic.details.chi++;
                 else if (rec.name.includes("英文")) stats.basic.details.eng++;
                 else if (rec.name.includes("軍訓") || rec.name.includes("全民國防")) stats.basic.details.mil++;
@@ -551,10 +523,7 @@
             else if (cat === "DeptElective") { lists.deptElec.push(rec); stats.deptElec.cred += rec.credit; stats.deptElec.count++; }
             else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } 
             else if (cat === "GenEd") { 
-                lists.genEd.push(rec); 
-                stats.genEd.cred += rec.credit; 
-                stats.genEd.count++; 
-                // 通識領域判定
+                lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; 
                 if (rec.name.includes("人文")) stats.genEd.domains.hu = true;
                 if (rec.name.includes("社會")) stats.genEd.domains.so = true;
                 if (rec.name.includes("自然")) stats.genEd.domains.na = true;
@@ -563,9 +532,11 @@
         });
 
         const finalGpa = totalGpaCredits > 0 ? (totalPoints / totalGpaCredits).toFixed(2) : "0.00";
-
         updateDashboard(stats, target, reqCheckList, finalGpa, totalGpaCredits);
         renderTables(lists, reqCheckList);
+        
+        // 新增：產生總結
+        renderMissingSummary(stats, target, reqCheckList);
     }
 
     // --- 5. 更新儀表板 ---
@@ -573,44 +544,26 @@
         document.getElementById('result-section').classList.remove('hidden');
 
         updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
-        
         const d = stats.basic.details;
-        const basicText = `
-            中文: ${d.chi}/2 ${d.chi>=2?'✔':'❌'} | 英文: ${d.eng}/4 ${d.eng>=4?'✔':'❌'}<br>
-            軍訓: ${d.mil}/1 ${d.mil>=1?'✔':'❌'} | 體育: ${d.pe}/4 ${d.pe>=4?'✔':'❌'}
-        `;
-        document.getElementById('basicDetailText').innerHTML = basicText;
+        document.getElementById('basicDetailText').innerHTML = `中文:${d.chi}/2 ${d.chi>=2?'✔':'❌'} | 英文:${d.eng}/4 ${d.eng>=4?'✔':'❌'}<br>軍訓:${d.mil}/1 ${d.mil>=1?'✔':'❌'} | 體育:${d.pe}/4 ${d.pe>=4?'✔':'❌'}`;
         const isBasicAllPass = (d.chi>=2 && d.eng>=4 && d.mil>=1 && d.pe>=4);
-        const basicStat = document.getElementById('basicStatus');
-        basicStat.className = `dash-status ${isBasicAllPass ? 'status-ok' : 'status-ng'}`;
-        basicStat.innerText = isBasicAllPass ? "已完成" : "未完成";
+        document.getElementById('basicStatus').className = `dash-status ${isBasicAllPass?'status-ok':'status-ng'}`;
+        document.getElementById('basicStatus').innerText = isBasicAllPass ? "已完成" : "未完成";
 
         document.getElementById('reqTarget').innerText = target.req;
         updateCard('req', stats.req.cred, target.req, stats.req.count, reqCheckList.length);
 
-        const eleCred = stats.deptElec.cred;
-        const labCount = stats.deptElecLab.count;
-        const eleTarget = target.deptElec; 
-        const isElecPass = eleCred >= eleTarget && labCount >= 1;
-        document.getElementById('deptElecCred').innerText = eleCred;
-        const eleStat = document.getElementById('deptElecStatus');
-        eleStat.className = `dash-status ${isElecPass ? 'status-ok' : 'status-ng'}`;
-        eleStat.innerText = isElecPass ? "達標" : "未達標";
-        document.getElementById('labStatusText').innerHTML = `實驗課: ${labCount} 門 (需 >= 1) ${labCount >= 1 ? '✅' : '❌'}`;
+        const isElecPass = stats.deptElec.cred >= target.deptElec && stats.deptElecLab.count >= 1;
+        document.getElementById('deptElecCred').innerText = stats.deptElec.cred;
+        document.getElementById('deptElecStatus').className = `dash-status ${isElecPass?'status-ok':'status-ng'}`;
+        document.getElementById('deptElecStatus').innerText = isElecPass ? "達標" : "未達標";
+        document.getElementById('labStatusText').innerHTML = `實驗課: ${stats.deptElecLab.count} 門 (需 >= 1) ${stats.deptElecLab.count>=1?'✅':'❌'}`;
 
-        // 通識
         updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
-        // 更新通識指標燈號
         const gd = stats.genEd.domains;
         document.getElementById('geTagHu').className = `ge-tag ${gd.hu ? 'active' : ''}`;
         document.getElementById('geTagSo').className = `ge-tag ${gd.so ? 'active' : ''}`;
         document.getElementById('geTagNa').className = `ge-tag ${gd.na ? 'active' : ''}`;
-        // 更新通識狀態 (需滿學分且三大領域皆有) -- 選項：暫時只檢查學分，因 PDF 規則複雜，這裡只亮燈提示
-        const genEdStat = document.getElementById('genEdStatus');
-        const isGenEdOk = stats.genEd.cred >= target.genEd; // 暫時以總學分為主，領域僅供參考
-        genEdStat.className = `dash-status ${isGenEdOk ? 'status-ok' : 'status-ng'}`;
-        genEdStat.innerText = isGenEdOk ? "已完成" : "未完成";
-
 
         document.getElementById('gpaValue').innerText = gpa;
         document.getElementById('gpaCount').innerText = gpaCount;
@@ -619,57 +572,79 @@
         const laborOk = document.getElementById('chkLabor').checked;
         document.getElementById('peStatusText').innerHTML = `體育門檻：${peOk ? '✅ 通過' : '❌ 未通過'}`;
         document.getElementById('laborStatusText').innerHTML = `勞作教育：${laborOk ? '✅ 通過' : '❌ 未通過'}`;
-        const threshStat = document.getElementById('thresholdStatus');
-        if (peOk && laborOk) {
-            threshStat.className = "dash-status status-ok";
-            threshStat.innerText = "已完成";
-        } else {
-            threshStat.className = "dash-status status-ng";
-            threshStat.innerText = "未完成";
-        }
-
-        const totalStat = document.getElementById('gradStatus');
-        totalStat.className = `dash-status ${stats.total >= target.total ? 'status-ok' : 'status-ng'}`;
-        totalStat.innerText = stats.total >= target.total ? "達標" : "未滿";
+        
+        const isTotalOk = stats.total >= target.total;
+        document.getElementById('gradStatus').className = `dash-status ${isTotalOk?'status-ok':'status-ng'}`;
+        document.getElementById('gradStatus').innerText = isTotalOk ? "達標" : "未滿";
         document.getElementById('totalCred').innerText = stats.total;
         document.getElementById('genElecCred').innerText = stats.genElec.cred;
     }
 
-    function updateCard(id, current, target, count, totalCount) {
-        // 安全檢查
-        const credEl = document.getElementById(`${id}Cred`);
-        if (credEl) credEl.innerText = current;
+    // --- 新增：總結邏輯 ---
+    function renderMissingSummary(stats, target, reqCheckList) {
+        const container = document.getElementById('missing-content');
+        const peOk = document.getElementById('chkPE').checked;
+        const laborOk = document.getElementById('chkLabor').checked;
+        let msgs = [];
 
-        const countEl = document.getElementById(`${id}Count`);
-        if (countEl) countEl.innerText = count;
+        // 基礎
+        const d = stats.basic.details;
+        if (d.chi < 2) msgs.push(`基礎: 中文尚缺 ${2 - d.chi} 門`);
+        if (d.eng < 4) msgs.push(`基礎: 英文尚缺 ${4 - d.eng} 門`);
+        if (d.mil < 1) msgs.push(`基礎: 軍訓/國防尚缺 1 門`);
+        if (d.pe < 4) msgs.push(`基礎: 體育尚缺 ${4 - d.pe} 門`);
 
-        if (totalCount !== undefined) {
-            const totalEl = document.getElementById(`${id}TotalCount`);
-            if (totalEl) totalEl.innerText = totalCount;
+        // 必修
+        if (stats.req.cred < target.req) msgs.push(`系必修: 學分不足 (目前 ${stats.req.cred}/${target.req})`);
+        reqCheckList.forEach(r => {
+            if (!r.matched) msgs.push(`必修缺課: ${r.name}`);
+        });
+
+        // 系選修
+        if (stats.deptElec.cred < target.deptElec) msgs.push(`系選修: 學分不足，尚缺 ${target.deptElec - stats.deptElec.cred} 學分`);
+        if (stats.deptElecLab.count < 1) msgs.push(`系選修: 缺少實驗課程 (需至少 1 門)`);
+
+        // 通識
+        if (stats.genEd.cred < target.genEd) msgs.push(`通識: 學分不足，尚缺 ${target.genEd - stats.genEd.cred} 學分`);
+        if (!stats.genEd.domains.hu) msgs.push(`通識: 缺少 [人文] 領域課程`);
+        if (!stats.genEd.domains.so) msgs.push(`通識: 缺少 [社會] 領域課程`);
+        if (!stats.genEd.domains.na) msgs.push(`通識: 缺少 [自然] 領域課程`);
+
+        // 門檻
+        if (!peOk) msgs.push(`畢業門檻: 體育門檻未勾選`);
+        if (!laborOk) msgs.push(`畢業門檻: 勞作教育未勾選`);
+
+        // 總學分
+        if (stats.total < target.total) msgs.push(`畢業總學分: 不足，尚差 ${target.total - stats.total} 學分`);
+
+        if (msgs.length === 0) {
+            container.innerHTML = `<div class="congrats-msg">🎉 恭喜！目前系統檢查所有項目皆已達標！</div>`;
+        } else {
+            let html = "";
+            msgs.forEach(m => html += `<div class="missing-item">${m}</div>`);
+            container.innerHTML = html;
         }
+    }
 
+    function updateCard(id, current, target, count, totalCount) {
+        const credEl = document.getElementById(`${id}Cred`); if(credEl) credEl.innerText = current;
+        const countEl = document.getElementById(`${id}Count`); if(countEl) countEl.innerText = count;
+        const totalEl = document.getElementById(`${id}TotalCount`); if(totalEl) totalEl.innerText = totalCount;
         const statEl = document.getElementById(`${id}Status`);
         if (statEl && id !== 'basic' && id !== 'genEd') {
-            const isPass = current >= target;
-            statEl.className = `dash-status ${isPass ? 'status-ok' : 'status-ng'}`;
-            statEl.innerText = isPass ? "已完成" : "未完成";
+            statEl.className = `dash-status ${current >= target ? 'status-ok' : 'status-ng'}`;
+            statEl.innerText = current >= target ? "已完成" : "未完成";
         }
     }
 
-    // --- 6. 渲染表格 + 導航 ---
-    function scrollToId(id) {
-        const el = document.getElementById(id);
-        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    function scrollToId(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 
     function renderTables(lists, reqCheckList) {
         const container = document.getElementById('tables-container');
         const backLink = `<div class="back-to-top" onclick="scrollToId('dashboard-anchor')">↑ 回到儀表板</div>`;
         let html = "";
 
-        html += `<h3 id="tbl-basic" class="category-header">1. 基礎課程</h3>`;
-        html += renderSimpleTable(lists.basic);
-        html += backLink;
+        html += `<h3 id="tbl-basic" class="category-header">1. 基礎課程</h3>` + renderSimpleTable(lists.basic) + backLink;
 
         html += `<h3 id="tbl-req" class="category-header">2. 學系必修科目</h3>`;
         html += `<table><thead><tr><th width="35%">必修科目名稱</th><th width="10%">學分</th><th width="15%">狀態</th><th width="40%">修課紀錄</th></tr></thead><tbody>`;
@@ -679,26 +654,13 @@
             const detail = r.log ? `${r.log.name} (${r.log.gpa})` : "-";
             html += `<tr><td style="padding-left:20px; font-weight:500;">${r.name}</td><td>${credit}</td><td>${status}</td><td>${detail}</td></tr>`;
         });
-        html += `</tbody></table>`;
-        html += backLink;
+        html += `</tbody></table>` + backLink;
 
-        html += `<h3 id="tbl-genEd" class="category-header">3. 通識課程</h3>`;
-        html += renderSimpleTable(lists.genEd);
-        html += backLink;
+        html += `<h3 id="tbl-genEd" class="category-header">3. 通識課程</h3>` + renderSimpleTable(lists.genEd) + backLink;
+        html += `<h3 id="tbl-deptElec" class="category-header">4. 系選修 (含實驗)</h3><div class="sub-category">▶ 系選修實驗 (實驗/實作)</div>${renderSimpleTable(lists.deptElecLab)}<br><div class="sub-category">▶ 系選修課程</div>${renderSimpleTable(lists.deptElec)}` + backLink;
+        html += `<h3 id="tbl-genElec" class="category-header">5. 一般選修 (外系選修)</h3>` + renderSimpleTable(lists.genElec) + backLink;
 
-        html += `<h3 id="tbl-deptElec" class="category-header">4. 系選修 (含實驗)</h3>`;
-        html += `<div class="sub-category">▶ 系選修實驗 (實驗/實作)</div>${renderSimpleTable(lists.deptElecLab)}`;
-        html += `<br><div class="sub-category">▶ 系選修課程</div>${renderSimpleTable(lists.deptElec)}`;
-        html += backLink;
-
-        html += `<h3 id="tbl-genElec" class="category-header">5. 一般選修 (外系選修)</h3>`;
-        html += renderSimpleTable(lists.genElec);
-        html += backLink;
-
-        if (lists.fail.length > 0) {
-            html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格 / 未通過</h3>${renderSimpleTable(lists.fail)}`;
-            html += backLink;
-        }
+        if (lists.fail.length > 0) html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格 / 未通過</h3>${renderSimpleTable(lists.fail)}` + backLink;
 
         container.innerHTML = html;
     }
@@ -713,12 +675,7 @@
     }
 
     function reAnalyzeIfReady() { if (parsedStudentData.length > 0) analyze(); }
-
-    function toggleAdmin() {
-        if (prompt("請輸入管理者密碼：") === "07160330") document.getElementById('admin-panel').style.display = 'block';
-        else alert("密碼錯誤");
-    }
-
+    function toggleAdmin() { if (prompt("請輸入管理者密碼：") === "07160330") document.getElementById('admin-panel').style.display = 'block'; else alert("密碼錯誤"); }
     function addException() {
         const name = document.getElementById('exName').value.trim();
         const type = document.getElementById('exType').value;
@@ -734,12 +691,7 @@
         document.getElementById('exName').value = "";
         reAnalyzeIfReady();
     }
-
-    function removeEx(btn, key) {
-        delete exceptionMap[key];
-        btn.parentElement.remove();
-        reAnalyzeIfReady();
-    }
+    function removeEx(btn, key) { delete exceptionMap[key]; btn.parentElement.remove(); reAnalyzeIfReady(); }
 </script>
 
 </body>
