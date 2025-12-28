@@ -17,10 +17,18 @@
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 10px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
+        /* 標題樣式調整 */
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 15px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
         
-        /* 新增：學生問候語樣式 */
-        .student-greeting { text-align: center; font-size: 14px; color: #666; margin-bottom: 25px; height: 20px; }
+        /* 修改：學生問候語樣式 (放大、加粗、更顯眼) */
+        .student-greeting { 
+            text-align: center; 
+            font-size: 24px;       /* 字體放大 */
+            font-weight: bold;     /* 加粗 */
+            color: var(--primary-color); /* 使用主題藍色 */
+            margin-bottom: 30px; 
+            min-height: 35px;      /* 預留空間 */
+        }
 
         /* 狀態列 */
         .status-bar { background: #e9ecef; padding: 10px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
@@ -85,7 +93,7 @@
         }
         .back-to-top:hover { text-decoration: underline; }
 
-        /* 新增：缺漏項目總結區塊 */
+        /* 缺漏項目總結區塊 */
         #missing-summary-panel {
             margin-top: 50px;
             background-color: #fff5f5;
@@ -128,7 +136,7 @@
             body { background: white; -webkit-print-color-adjust: exact; }
             .dash-card { border: 1px solid #999; break-inside: avoid; }
             h1 { font-size: 24px; margin-bottom: 10px; }
-            .student-greeting { display: block !important; margin-bottom: 20px; font-weight: bold; color: #000; }
+            .student-greeting { display: block !important; margin-bottom: 20px; font-weight: bold; color: #000; font-size: 20px; }
             .category-header { margin-top: 30px; page-break-after: avoid; }
             table { page-break-inside: auto; }
             tr { page-break-inside: avoid; page-break-after: auto; }
@@ -139,7 +147,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統</h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.6em; color:#666;">(by HC)</span></h1>
     <div id="greetingDisplay" class="student-greeting"></div>
 
     <div class="status-bar">
@@ -175,8 +183,8 @@
             </div>
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援格式：.xlsx, .csv (檔名將作為稱呼)。<br>
-                <strong>更新：</strong>最下方新增「缺漏項目總結」；保留所有修復規則。
+                支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
+                <strong>功能：</strong>最下方有缺漏總結；通識含領域指標；化學/物理實驗歸類為外系選修。
             </div>
         </div>
     </div>
@@ -365,8 +373,8 @@
         const file = fileInput.files[0];
         if (!file) { alert("請先選擇檔案！"); return; }
 
-        // 新增：讀取檔名並顯示問候語
-        const fileName = file.name.split('.')[0]; // 去除副檔名
+        // 讀取檔名並顯示問候語
+        const fileName = file.name.split('.')[0]; 
         const greetingEl = document.getElementById('greetingDisplay');
         greetingEl.innerText = `👋 ${fileName} 你好`;
 
@@ -534,8 +542,6 @@
         const finalGpa = totalGpaCredits > 0 ? (totalPoints / totalGpaCredits).toFixed(2) : "0.00";
         updateDashboard(stats, target, reqCheckList, finalGpa, totalGpaCredits);
         renderTables(lists, reqCheckList);
-        
-        // 新增：產生總結
         renderMissingSummary(stats, target, reqCheckList);
     }
 
@@ -580,41 +586,33 @@
         document.getElementById('genElecCred').innerText = stats.genElec.cred;
     }
 
-    // --- 新增：總結邏輯 ---
+    // --- 缺漏項目總結 ---
     function renderMissingSummary(stats, target, reqCheckList) {
         const container = document.getElementById('missing-content');
         const peOk = document.getElementById('chkPE').checked;
         const laborOk = document.getElementById('chkLabor').checked;
         let msgs = [];
 
-        // 基礎
         const d = stats.basic.details;
         if (d.chi < 2) msgs.push(`基礎: 中文尚缺 ${2 - d.chi} 門`);
         if (d.eng < 4) msgs.push(`基礎: 英文尚缺 ${4 - d.eng} 門`);
         if (d.mil < 1) msgs.push(`基礎: 軍訓/國防尚缺 1 門`);
         if (d.pe < 4) msgs.push(`基礎: 體育尚缺 ${4 - d.pe} 門`);
 
-        // 必修
         if (stats.req.cred < target.req) msgs.push(`系必修: 學分不足 (目前 ${stats.req.cred}/${target.req})`);
-        reqCheckList.forEach(r => {
-            if (!r.matched) msgs.push(`必修缺課: ${r.name}`);
-        });
+        reqCheckList.forEach(r => { if (!r.matched) msgs.push(`必修缺課: ${r.name}`); });
 
-        // 系選修
         if (stats.deptElec.cred < target.deptElec) msgs.push(`系選修: 學分不足，尚缺 ${target.deptElec - stats.deptElec.cred} 學分`);
         if (stats.deptElecLab.count < 1) msgs.push(`系選修: 缺少實驗課程 (需至少 1 門)`);
 
-        // 通識
         if (stats.genEd.cred < target.genEd) msgs.push(`通識: 學分不足，尚缺 ${target.genEd - stats.genEd.cred} 學分`);
         if (!stats.genEd.domains.hu) msgs.push(`通識: 缺少 [人文] 領域課程`);
         if (!stats.genEd.domains.so) msgs.push(`通識: 缺少 [社會] 領域課程`);
         if (!stats.genEd.domains.na) msgs.push(`通識: 缺少 [自然] 領域課程`);
 
-        // 門檻
         if (!peOk) msgs.push(`畢業門檻: 體育門檻未勾選`);
         if (!laborOk) msgs.push(`畢業門檻: 勞作教育未勾選`);
 
-        // 總學分
         if (stats.total < target.total) msgs.push(`畢業總學分: 不足，尚差 ${target.total - stats.total} 學分`);
 
         if (msgs.length === 0) {
