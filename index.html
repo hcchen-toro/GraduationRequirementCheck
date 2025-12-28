@@ -3,14 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (2.0版)</title>
+    <title>東海電機畢業學分審查系統 (Excel加強版)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary-color: #004b97; --secondary-color: #e9ecef; }
+        :root { --primary-color: #004b97; --secondary-color: #e9ecef; --accent-color: #d63384; }
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; line-height: 1.6; }
         .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-radius: 12px; }
         
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 30px; border-bottom: 2px solid var(--primary-color); padding-bottom: 15px; }
-        h3 { color: #555; border-left: 5px solid var(--primary-color); padding-left: 10px; margin-top: 30px; }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 20px; border-bottom: 2px solid var(--primary-color); padding-bottom: 15px; }
+        
+        .status-bar { background: #e2e3e5; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .status-ready { color: #198754; font-weight: bold; }
+        .status-loading { color: #0d6efd; font-weight: bold; }
+        .status-error { color: #dc3545; font-weight: bold; }
 
         .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: var(--secondary-color); padding: 20px; border-radius: 8px; margin-bottom: 20px; }
         .input-group { margin-bottom: 15px; }
@@ -18,60 +23,55 @@
         
         button.btn { padding: 10px 20px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: background 0.3s; }
         button.btn:hover { background-color: #003366; }
-        button.btn-secondary { background-color: #6c757d; }
-        button.btn-secondary:hover { background-color: #5a6268; }
-
+        button.btn-admin { background-color: #6c757d; font-size: 12px; padding: 5px 10px; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: center; }
+        th, td { border: 1px solid #dee2e6; padding: 8px; text-align: center; }
         th { background-color: var(--primary-color); color: white; }
         tr:nth-child(even) { background-color: #f8f9fa; }
         
         .pass { color: #198754; font-weight: bold; }
         .fail { color: #dc3545; font-weight: bold; }
-        .pending { color: #fd7e14; font-weight: bold; }
         
-        .summary-box { display: flex; gap: 20px; margin-bottom: 20px; }
-        .stat-card { flex: 1; background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #bbdefb; }
+        .summary-box { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+        .stat-card { flex: 1; min-width: 150px; background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #bbdefb; }
         .stat-val { font-size: 24px; font-weight: bold; color: var(--primary-color); }
 
-        #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
+        /* 管理者面板 */
+        #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; position: relative; }
+        .admin-badge { position: absolute; top: -10px; right: 10px; background: #ffc107; padding: 2px 8px; font-size: 12px; border-radius: 4px; font-weight: bold; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>東海大學電機系 畢業學分審查系統</h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.6em; color:#666;">(v3.0)</span></h1>
+
+    <div class="status-bar">
+        <span id="dbStatus">正在初始化...</span>
+        <button class="btn btn-admin" onclick="toggleAdmin()">🔧 管理者模式</button>
+    </div>
 
     <div class="control-panel">
-        <div>
-            <div class="input-group">
-                <label>1. 選擇入學年度 (對應必修規則)</label>
-                <select id="admissionYear" class="form-control" style="padding: 8px; width: 100%;">
-                    <option value="111">111 學年度</option>
-                    <option value="112">112 學年度</option>
-                    <option value="113">113 學年度</option>
-                    <option value="114">114 學年度</option>
-                </select>
-            </div>
-            
-            <div class="input-group">
-                <label>2. 上傳學生成績單 (CSV/Excel)</label>
-                <input type="file" id="csvFile" accept=".csv" />
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">格式：學年度,學期,選課代號,科目名稱,學分,GPA</div>
-            </div>
+        <div class="input-group">
+            <label>1. 選擇入學年度 (必修規則)</label>
+            <select id="admissionYear" class="form-control" style="padding: 8px; width: 100%;" onchange="reAnalyzeIfReady()">
+                <option value="111">111 學年度</option>
+                <option value="112">112 學年度</option>
+                <option value="113">113 學年度</option>
+                <option value="114">114 學年度</option>
+            </select>
         </div>
 
-        <div>
-            <div class="input-group">
-                <label>3. 載入開課資料 (COURSE 資料夾)</label>
-                <div style="font-size: 12px; color: #d9534f; margin-bottom: 5px;">
-                    * 若無架設 Server，請點下方按鈕手動選取 COURSE 資料夾內的所有 JSON 檔
-                </div>
-                <input type="file" id="jsonFiles" multiple accept=".json" />
-                <div style="margin-top: 10px;">
-                    <button class="btn" onclick="startAnalysis()">開始分析</button>
-                </div>
+        <div class="input-group">
+            <label>2. 上傳成績單 (.xlsx / .csv)</label>
+            <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" />
+            <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                支援 Excel 檔。欄位需包含：學年度, 學期, 選課代號, 科目名稱, 學分, GPA
+            </div>
+            <div style="margin-top: 15px;">
+                <button class="btn" onclick="processFileAndAnalyze()">開始分析</button>
             </div>
         </div>
     </div>
@@ -91,40 +91,47 @@
                 <div class="stat-val" id="elecCredits">0</div>
             </div>
             <div class="stat-card">
+                <div>通識/其他學分</div>
+                <div class="stat-val" id="genCredits">0</div>
+            </div>
+            <div class="stat-card">
                 <div>總取得學分</div>
                 <div class="stat-val" id="totalCredits">0</div>
             </div>
         </div>
-
         <div id="tables-container"></div>
     </div>
 
-    <div style="text-align: right; margin-top: 40px; border-top: 1px solid #ccc; padding-top: 10px;">
-        <span style="font-size: 12px; color: #999; cursor: pointer;" onclick="toggleAdmin()">管理者登入</span>
-    </div>
-    
     <div id="admin-panel">
-        <h3>管理者例外管理 (密碼驗證通過)</h3>
-        <p>針對特殊課程進行歸類調整：</p>
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <input type="text" id="exCode" placeholder="選課代號 (如 1091)" style="padding: 5px;">
-            <select id="exType" style="padding: 5px;">
-                <option value="Required">系必修</option>
-                <option value="Elective">系選修</option>
-                <option value="General">通識/其他</option>
+        <div class="admin-badge">Admin Mode</div>
+        <h3>例外管理控制台</h3>
+        <p>在此設定特殊課程的歸屬，設定後會即時更新分析結果。</p>
+        
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="exCode" placeholder="選課代號 (如 1091)" style="padding: 8px; width: 150px;">
+            <select id="exType" style="padding: 8px;">
+                <option value="Required">強制設為：系必修</option>
+                <option value="Elective">強制設為：系選修</option>
+                <option value="General">強制設為：通識/其他</option>
             </select>
-            <button class="btn btn-secondary" onclick="addException()">新增規則</button>
+            <button class="btn" style="padding: 8px 15px; font-size: 14px;" onclick="addException()">新增規則</button>
         </div>
-        <ul id="exceptionList" style="margin-top: 10px;"></ul>
+
+        <div style="margin-top: 15px; border-top: 1px solid #dee2e6; padding-top: 10px;">
+            <strong>目前的例外規則：</strong>
+            <ul id="exceptionList" style="list-style: none; padding: 0; margin-top: 5px;">
+                <li style="color:#666;">(尚無規則)</li>
+            </ul>
+        </div>
     </div>
 </div>
 
 <script>
-    // --- 1. 必修規則定義 (依據 PDF 111-114 提取) ---
-    // 注意：名稱採模糊比對，代碼採精確比對
+    // --- 1. 資料與全域變數 ---
+    
+    // 必修規則 (111~114) - 保持不變
     const RULES = {
         "111": {
-            reqCredits: 84,
             subjects: [
                 { name: "微積分甲〈一〉", codes: ["24383", "1100"], credits: 3 },
                 { name: "普通物理", codes: ["21004", "1091"], credits: 3 },
@@ -134,7 +141,7 @@
                 { name: "邏輯設計實驗", codes: ["36001", "1096"], credits: 1 },
                 { name: "微積分甲〈二〉", codes: ["24385", "1098"], credits: 3 },
                 { name: "程式語言", codes: ["28027", "1094"], credits: 3 },
-                { name: "工程數學（Ⅰ）", codes: ["36033", "1091"], credits: 3 }, // 修正括號格式
+                { name: "工程數學（Ⅰ）", codes: ["36033", "1091"], credits: 3 },
                 { name: "工程數學（Ⅱ）", codes: ["36034", "1102"], credits: 3 },
                 { name: "電子學（Ⅰ）", codes: ["36029", "1127"], credits: 3 },
                 { name: "電路學（Ⅰ）", codes: ["36162", "1103"], credits: 3 },
@@ -147,22 +154,17 @@
                 { name: "電磁學（Ⅱ）", codes: ["36036"], credits: 3 },
                 { name: "專題研究", codes: ["22107"], credits: 2 },
                 { name: "專題實作", codes: ["28350"], credits: 2 },
-                // 111年特有或舊制
                 { name: "工程數學軟體實習", codes: ["36147", "1097"], credits: 1 }, 
                 { name: "電子電路軟體實習", codes: ["36146"], credits: 1 },
                 { name: "系統軟體實習", codes: ["36148"], credits: 1 }
             ]
         },
-        "112": {
-            reqCredits: 84,
-            subjects: [] // 112結構與111相似，初始化時會複製 111 並可微調
-        },
+        "112": { subjects: [] },
         "113": {
-            reqCredits: 81,
             subjects: [
                 { name: "微積分甲〈一〉", codes: ["24383", "1100"], credits: 3 },
                 { name: "普通物理", codes: ["21004", "1091"], credits: 3 },
-                { name: "程式設計", codes: ["28111", "1093"], credits: 3 }, // 或AI思維
+                { name: "程式設計", codes: ["28111", "1093"], credits: 3 },
                 { name: "邏輯設計", codes: ["28071", "1095"], credits: 3 },
                 { name: "線性代數", codes: ["21020", "1098"], credits: 3 },
                 { name: "邏輯設計實驗", codes: ["36001", "1096"], credits: 1 },
@@ -181,279 +183,360 @@
                 { name: "電磁學（Ⅱ）", codes: ["36036"], credits: 3 },
                 { name: "專題研究", codes: ["22107"], credits: 2 },
                 { name: "專題實作", codes: ["28350"], credits: 2 }
-                // 113年學分減少，移除了部分軟體實習必修
             ]
         },
-        "114": {
-            reqCredits: 81,
-            subjects: [] // 同 113
-        }
+        "114": { subjects: [] }
     };
-    // 補全規則
+    // 複製規則
     RULES["112"].subjects = JSON.parse(JSON.stringify(RULES["111"].subjects));
     RULES["114"].subjects = JSON.parse(JSON.stringify(RULES["113"].subjects));
 
-    // --- Global Variables ---
-    let courseDatabase = {}; // Key: "112-1-1091" (Year-Sem-Code) -> CourseObj
-    let studentRecords = [];
-    let exceptionMap = {}; // Admin defined
+    let courseDatabase = {}; // Key: "Year-Sem-Code"
+    let parsedStudentData = []; // 暫存已解析的學生資料
+    let exceptionMap = {}; // 管理者例外
+    let isDbLoaded = false;
 
-    // --- 2. 檔案讀取 (CSV & JSON) ---
-    
-    // 讀取 JSON 開課資料
-    async function loadCourseData() {
-        const input = document.getElementById('jsonFiles');
-        courseDatabase = {}; // Reset
+    // --- 2. 自動載入開課資料 (取代手動上傳) ---
+    window.onload = async function() {
+        const dbStatus = document.getElementById('dbStatus');
+        dbStatus.innerText = "⏳ 正在從 ./COURSE/ 資料夾讀取開課資料...";
+        dbStatus.className = "status-loading";
 
-        // 策略：如果使用者有上傳檔案，優先使用上傳的檔案
-        if (input.files.length > 0) {
-            for (let file of input.files) {
-                const text = await file.text();
-                try {
-                    const json = JSON.parse(text);
-                    // 檔名解析: "1141A-data.json" -> Year:114, Sem:1
-                    const filename = file.name;
-                    const match = filename.match(/^(\d{3})(\d)[A-Za-z]/);
-                    if (match) {
-                        const year = match[1];
-                        const sem = match[2];
-                        processJsonToDB(json, year, sem);
-                    }
-                } catch (e) { console.error("JSON Parse Error", file.name, e); }
-            }
-            return true;
-        } 
+        // 產生可能的檔名清單 (111~114, 1/2, A/M)
+        const years = [111, 112, 113, 114];
+        const sems = [1, 2];
+        const systems = ['A', 'M']; // A:日間, M:研究所
+        let filesToFetch = [];
+
+        years.forEach(y => {
+            sems.forEach(s => {
+                systems.forEach(sys => {
+                    filesToFetch.push(`${y}${s}${sys}-data.json`);
+                });
+            });
+        });
+
+        let successCount = 0;
         
-        // 策略：如果沒上傳，嘗試 fetch 本地 (需要 Local Server)
-        try {
-            console.log("嘗試從伺服器讀取預設 JSON...");
-            const defaultFiles = ["1121A-data.json", "1122A-data.json", "1131A-data.json", "1132A-data.json"];
-            for (let fname of defaultFiles) {
-                const res = await fetch(`./COURSE/${fname}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    const match = fname.match(/^(\d{3})(\d)[A-Za-z]/);
-                    if (match) processJsonToDB(json, match[1], match[2]);
+        // 並行下載
+        const requests = filesToFetch.map(fileName => 
+            fetch(`./COURSE/${fileName}`)
+                .then(res => {
+                    if(!res.ok) throw new Error("404");
+                    return res.json().then(json => ({ fileName, json }));
+                })
+                .catch(err => null) // 失敗回傳 null
+        );
+
+        const results = await Promise.all(requests);
+        
+        results.forEach(item => {
+            if (item) {
+                successCount++;
+                // 解析檔名取得 Year, Sem
+                const match = item.fileName.match(/^(\d{3})(\d)[A-Za-z]/);
+                if (match) {
+                    processJsonToDB(item.json, match[1], match[2]);
                 }
             }
-            return true;
-        } catch (e) {
-            console.warn("無法自動讀取 COURSE 資料夾 (可能無 Server)，請手動上傳。");
-            return false;
+        });
+
+        if (successCount > 0) {
+            isDbLoaded = true;
+            dbStatus.innerText = `✅ 系統就緒 (已載入 ${successCount} 個開課檔案)`;
+            dbStatus.className = "status-ready";
+        } else {
+            dbStatus.innerText = "⚠️ 無法載入開課資料 (請確認 COURSE 資料夾是否存在於 Server)";
+            dbStatus.className = "status-error";
         }
-    }
+    };
 
     function processJsonToDB(json, year, sem) {
-        // json 結構: Key 是 ID (如 "2964"), Value 是 Object
+        // 將 JSON 資料轉入 courseDatabase 索引
         for (let key in json) {
-            const course = json[key];
-            // 我們需要建立索引: "學年-學期-選課代號" -> 開課單位
-            // 注意：JSON 中的 course_code 可能為空，selection_id 應為選課代號
-            const code = course.selection_id || course.course_code; 
-            const dbKey = `${year}-${sem}-${code}`;
-            
-            // 判斷開課單位 (opened_by_dept)
-            // 假設電機系代碼包含特定 ID，或直接存入整個物件供後續判斷
-            courseDatabase[dbKey] = course;
+            const c = json[key];
+            const code = c.selection_id || c.course_code;
+            if (code) {
+                const dbKey = `${year}-${sem}-${code}`;
+                courseDatabase[dbKey] = c;
+            }
         }
     }
 
-    // 讀取 CSV
+    // --- 3. 檔案處理 (Excel & CSV) ---
+    function processFileAndAnalyze() {
+        const fileInput = document.getElementById('studentFile');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            alert("請先選擇檔案！");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = e.target.result;
+            
+            // 判斷是否為 Excel
+            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                try {
+                    const workbook = XLSX.read(data, { type: 'binary' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    // 轉為 JSON，第一列為 Header
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    parsedStudentData = normalizeData(jsonData);
+                    analyze();
+                } catch (err) {
+                    console.error(err);
+                    alert("Excel 讀取失敗，請確認檔案格式不被保護。");
+                }
+            } else {
+                // CSV 處理
+                parsedStudentData = parseCSV(data);
+                analyze();
+            }
+        };
+
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            reader.readAsBinaryString(file);
+        } else {
+            reader.readAsText(file); // CSV 用 Text 讀取
+        }
+    }
+
+    // 將 Excel JSON 轉為統一格式
+    function normalizeData(jsonData) {
+        // 尋找對應的 key (容許使用者表頭有些微差異)
+        return jsonData.map(row => {
+            // 嘗試抓取欄位
+            return {
+                year: String(row['學年度'] || row['year'] || "").trim(),
+                sem: String(row['學期'] || row['semester'] || "").trim(),
+                code: String(row['選課代號'] || row['code'] || "").trim(),
+                name: String(row['科目名稱'] || row['name'] || "").trim(),
+                credit: parseFloat(row['學分'] || row['credits'] || 0),
+                gpa: String(row['GPA'] || row['gpa'] || "").trim()
+            };
+        }).filter(item => item.year && item.name); // 過濾空行
+    }
+
     function parseCSV(text) {
         const lines = text.split('\n');
-        const data = [];
-        // Skip header (row 0)
+        const result = [];
+        // 假設第一行是標題，跳過
         for (let i = 1; i < lines.length; i++) {
             const line = lines[i].trim();
-            if (!line) continue;
-            // 處理 CSV 引號 (簡易版)
-            const parts = line.split(',');
-            if (parts.length >= 6) {
-                // 格式: 學年度,學期,選課代號,科目名稱,學分,GPA
-                data.push({
-                    year: parts[0].trim(),
-                    sem: parts[1].trim() === '上' ? '1' : (parts[1].trim() === '下' ? '2' : parts[1].trim()),
-                    code: parts[2].trim(),
-                    name: parts[3].trim(),
-                    credit: parseFloat(parts[4]),
-                    gpa: parts[5].trim()
+            if(!line) continue;
+            const cols = line.split(',');
+            if (cols.length >= 6) {
+                result.push({
+                    year: cols[0].trim(),
+                    sem: cols[1].trim(),
+                    code: cols[2].trim(),
+                    name: cols[3].trim(),
+                    credit: parseFloat(cols[4]),
+                    gpa: cols[5].trim()
                 });
             }
         }
-        return data;
+        return result;
     }
 
-    // --- 3. 核心邏輯 ---
+    // --- 4. 核心分析邏輯 ---
+    function analyze() {
+        if (parsedStudentData.length === 0) {
+            alert("沒有可分析的資料");
+            return;
+        }
 
-    // 及格判斷 (使用者要求 D 不及格)
-    function isPass(gpa) {
-        const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-'];
-        return passGrades.includes(gpa);
-    }
+        const year = document.getElementById('admissionYear').value;
+        const rule = RULES[year];
+        
+        // 變數歸零
+        let credits = { req: 0, elec: 0, gen: 0, total: 0 };
+        let resultLists = { req: [], elec: [], gen: [], fail: [] };
 
-    function getDepartment(year, sem, code) {
-        const key = `${year}-${sem}-${code}`;
-        const course = courseDatabase[key];
-        if (!course) return "Unknown";
-        
-        // 判斷是否為電機系
-        // 根據一般經驗與 JSON 結構，opened_by_dept 是一個 Array
-        // 假設電機系 ID 需根據實際資料判斷，這裡先用名稱輔助，或假設使用者會上傳正確的開課檔
-        // 這裡做一個簡單邏輯：若找不到，回傳 Unknown
-        // 若找到，回傳 dept_name 或 檢查 opened_by_dept
-        // *模擬邏輯*：若資料庫中有此課，且課程名稱很專業，或 JSON 有系所欄位
-        // 為了展示，我們檢查 opened_by_dept 是否包含電機系代碼 (假設電機系代碼為 36 或其他，這裡先回傳 raw data)
-        return course.opened_by_dept ? course.opened_by_dept : "Unknown"; 
-    }
+        // 建立必修檢查清單 (深拷貝)
+        let reqCheckList = rule.subjects.map(s => ({ ...s, matched: false, log: null }));
 
-    async function startAnalysis() {
-        // 1. 準備資料
-        await loadCourseData();
-        
-        const csvFile = document.getElementById('csvFile').files[0];
-        if (!csvFile) { alert("請先上傳成績單 CSV！"); return; }
-        
-        const text = await csvFile.text();
-        studentRecords = parseCSV(text);
-        
-        const admissionYear = document.getElementById('admissionYear').value;
-        const currentRule = RULES[admissionYear];
+        // 開始遍歷學生修課紀錄
+        parsedStudentData.forEach(record => {
+            // 1. 判斷及格 (只有 A+, A, A-, B+, B, B-, C+, C, C- 算過)
+            // 使用者強調：D 為不及格
+            const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-'];
+            const isPass = passGrades.includes(record.gpa);
 
-        // 2. 分析變數
-        let totalCredits = 0;
-        let deptReqCredits = 0;
-        let deptElecCredits = 0;
-        
-        // 複製一份必修清單來追蹤狀態
-        let reqCheckList = currentRule.subjects.map(s => ({...s, status: 'Unfinished', actualCourse: null}));
-        let categorizedCourses = {
-            "Required": [],
-            "Elective": [],
-            "General": [],
-            "Fail": []
-        };
+            // 處理學期轉換 (上/下 -> 1/2)
+            let semDigit = record.sem;
+            if (semDigit === '上') semDigit = '1';
+            if (semDigit === '下') semDigit = '2';
 
-        // 3. 逐筆審查
-        for (let record of studentRecords) {
-            const passed = isPass(record.gpa);
-            
-            // 如果不及格，直接丟入 Fail，不算學分
-            if (!passed) {
-                categorizedCourses.Fail.push(record);
-                continue;
+            if (!isPass) {
+                resultLists.fail.push(record);
+                return; // 不及格不計入任何學分
             }
 
-            // 及格課程，開始歸類
-            let matchedReq = false;
+            // 2. 判斷分類
+            let category = "General"; // 預設
 
-            // A. 檢查是否為「例外管理」課程
+            // A. 例外管理優先
             if (exceptionMap[record.code]) {
-                const type = exceptionMap[record.code];
-                if (type === 'Required') {
-                    deptReqCredits += record.credit;
-                    categorizedCourses.Required.push(record);
-                    matchedReq = true; // 視為已匹配必修
-                } else if (type === 'Elective') {
-                    deptElecCredits += record.credit;
-                    categorizedCourses.Elective.push(record);
-                    matchedReq = true;
-                } else {
-                    categorizedCourses.General.push(record);
-                    matchedReq = true;
-                }
-            }
-
-            // B. 檢查是否為「系必修」(若尚未被例外處理)
-            if (!matchedReq) {
-                // 比對規則清單
-                for (let req of reqCheckList) {
-                    // 比對邏輯：代碼吻合 OR 名稱高度相似
-                    // 移除全形括號、空格後比對
+                category = exceptionMap[record.code];
+            } else {
+                // B. 比對系必修
+                let isReq = false;
+                for (let r of reqCheckList) {
+                    // 比對代碼 或 名稱(去除括號)
                     const recNameClean = record.name.replace(/[（(].*?[)）]/g, "").trim();
-                    const reqNameClean = req.name.replace(/[（(].*?[)）]/g, "").trim();
-
-                    const codeMatch = req.codes.includes(record.code);
-                    const nameMatch = record.name.includes(reqNameClean); // 寬鬆比對
-
-                    if ((codeMatch || nameMatch) && req.status !== 'Passed') {
-                        req.status = 'Passed';
-                        req.actualCourse = record;
-                        categorizedCourses.Required.push(record);
-                        deptReqCredits += record.credit;
-                        matchedReq = true;
+                    const reqNameClean = r.name.replace(/[（(].*?[)）]/g, "").trim();
+                    
+                    // 邏輯：代碼吻合 OR 名稱包含且尚未抵免
+                    if ( (r.codes.includes(record.code) || record.name.includes(reqNameClean)) && !r.matched ) {
+                        r.matched = true;
+                        r.log = record;
+                        isReq = true;
                         break;
                     }
                 }
-            }
-
-            // C. 若非系必修，判斷是「系選修」還是「通識/其他」
-            if (!matchedReq) {
-                // 查詢開課單位
-                // 這裡需要一個強判定：如果是「電機系」開的課 -> 系選修
-                // 由於沒有真實後端，我們用 heuristic：
-                // 1. 查 CourseDB 
-                // 2. 若 CSV 內無開課單位，檢查代碼 (假設電機系代碼開頭規則，或從 JSON 查)
-                // 3. 簡單邏輯：若課名包含 "電" 或 "工程" 且非通識 -> 暫歸系選修
-                
-                const dbInfo = courseDatabase[`${record.year}-${record.sem}-${record.code}`];
-                let isDeptCourse = false;
-                
-                if (dbInfo) {
-                    // 假設 JSON 中 opened_by_dept = [36] 是電機系 (這裡需依實際 JSON 調整)
-                    // 暫時用: 若有找到資料，且非通識中心，假設為專業選修
-                    // 這裡為了演示，若名稱不含 "通識"、"體育"、"國防"、"中文"、"英文"，歸類為系選修
-                    if (!record.name.includes("通識") && !record.name.includes("體育")) {
-                        isDeptCourse = true;
+                if (isReq) category = "Required";
+                else {
+                    // C. 判斷系選修 (查詢 CourseDB)
+                    const dbKey = `${record.year}-${semDigit}-${record.code}`;
+                    const courseInfo = courseDatabase[dbKey];
+                    
+                    // 判斷邏輯：
+                    // 1. 若資料庫有該課，且開課單位代碼(假設)包含電機系
+                    //    (因無法得知確切代碼，這裡改用名稱判斷法做 Fallback)
+                    // 2. 若課名看起來像專業課程 (不含通識、體育等關鍵字)
+                    const nonDeptKeywords = ["通識", "體育", "國防", "中文", "英文", "歷史", "博雅"];
+                    let isLikelyDept = true;
+                    for (let k of nonDeptKeywords) {
+                        if (record.name.includes(k)) isLikelyDept = false;
                     }
-                } else {
-                    // 沒資料時的 Fallback
-                    if (!record.name.includes("通識") && !record.name.includes("體育") && 
-                        !record.name.includes("國防") && !record.name.includes("中文")) {
-                        // 假設是系選修
-                        isDeptCourse = true;
-                    }
-                }
 
-                if (isDeptCourse) {
-                    categorizedCourses.Elective.push(record);
-                    deptElecCredits += record.credit;
-                } else {
-                    categorizedCourses.General.push(record);
+                    if (isLikelyDept) category = "Elective";
+                    else category = "General";
                 }
             }
 
-            if (passed) totalCredits += record.credit;
-        }
+            // 3. 統計
+            if (category === "Required") {
+                credits.req += record.credit;
+                resultLists.req.push(record);
+            } else if (category === "Elective") {
+                credits.elec += record.credit;
+                resultLists.elec.push(record);
+            } else {
+                credits.gen += record.credit;
+                resultLists.gen.push(record);
+            }
+            credits.total += record.credit;
+        });
 
-        // 4. 更新 UI
-        document.getElementById('result-section').classList.remove('hidden');
-        document.getElementById('reqCredits').innerText = deptReqCredits;
-        document.getElementById('elecCredits').innerText = deptElecCredits;
-        document.getElementById('totalCredits').innerText = totalCredits;
-        
-        // 計算完成率
-        const passedReqCount = reqCheckList.filter(r => r.status === 'Passed').length;
-        const totalReqCount = reqCheckList.length;
-        document.getElementById('reqRate').innerText = Math.round((passedReqCount / totalReqCount) * 100) + "%";
-
-        renderTables(reqCheckList, categorizedCourses);
+        // 4. 渲染 UI
+        updateUI(credits, resultLists, reqCheckList);
     }
 
-    function renderTables(reqList, catCourses) {
+    function updateUI(credits, lists, reqCheckList) {
+        document.getElementById('result-section').classList.remove('hidden');
+        
+        // 更新數字卡片
+        document.getElementById('reqCredits').innerText = credits.req;
+        document.getElementById('elecCredits').innerText = credits.elec;
+        document.getElementById('genCredits').innerText = credits.gen;
+        document.getElementById('totalCredits').innerText = credits.total;
+
+        const passedCount = reqCheckList.filter(r => r.matched).length;
+        document.getElementById('reqRate').innerText = Math.round((passedCount / reqCheckList.length) * 100) + "%";
+
+        // 更新表格
         const container = document.getElementById('tables-container');
         let html = "";
 
-        // 表 1: 必修執行狀況
-        html += `<h3>系必修科目檢核</h3>
+        // 表 1: 必修核對表
+        html += `<h4>📌 系必修核對狀況</h4>
         <table>
-            <thead><tr><th>科目規定</th><th>狀態</th><th>修課紀錄 (學年/期/代碼/成績)</th></tr></thead>
+            <thead><tr><th>必修科目</th><th>規定學分</th><th>狀態</th><th>抵免課程</th></tr></thead>
             <tbody>`;
-        reqList.forEach(r => {
-            const statusClass = r.status === 'Passed' ? 'pass' : 'fail';
-            const statusText = r.status === 'Passed' ? '已修習' : '未修習';
-            let detail = "-";
-            if (r.actualCourse) {
-                const c = r.actualCourse;
-                detail = `${c.year}-${c.sem} | ${c.name} (${c.gpa})`;
-            }
-            html +=
+        reqCheckList.forEach(r => {
+            const status = r.matched ? '<span class="pass">已修習</span>' : '<span class="fail">未修習</span>';
+            const detail = r.log ? `${r.log.year}-${r.log.sem} | ${r.log.name} (${r.log.gpa})` : "-";
+            html += `<tr><td>${r.name}</td><td>${r.credits}</td><td>${status}</td><td>${detail}</td></tr>`;
+        });
+        html += `</tbody></table><br>`;
+
+        // 表 2: 系選修
+        html += `<h4>📘 系選修 (${credits.elec} 學分)</h4>${renderCourseTable(lists.elec)}`;
+
+        // 表 3: 通識/其他
+        html += `<h4>🌍 通識與其他 (${credits.gen} 學分)</h4>${renderCourseTable(lists.gen)}`;
+
+        // 表 4: 不及格
+        html += `<h4 style="color:#dc3545">❌ 不及格 / 未通過</h4>${renderCourseTable(lists.fail)}`;
+
+        container.innerHTML = html;
+    }
+
+    function renderCourseTable(list) {
+        if (list.length === 0) return "<p style='color:#666; font-size:14px;'>無資料</p>";
+        let h = `<table><thead><tr><th>學年期</th><th>代碼</th><th>課名</th><th>學分</th><th>GPA</th></tr></thead><tbody>`;
+        list.forEach(c => {
+            h += `<tr><td>${c.year}-${c.sem}</td><td>${c.code}</td><td>${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`;
+        });
+        h += `</tbody></table><br>`;
+        return h;
+    }
+
+    function reAnalyzeIfReady() {
+        if (parsedStudentData.length > 0) analyze();
+    }
+
+    // --- 5. 管理者功能 ---
+    function toggleAdmin() {
+        const pwd = prompt("請輸入管理者密碼：");
+        if (pwd === "07160330") {
+            document.getElementById('admin-panel').style.display = 'block';
+            alert("管理者登入成功！下方例外管理面板已啟用。");
+        } else {
+            alert("密碼錯誤！");
+        }
+    }
+
+    function addException() {
+        const code = document.getElementById('exCode').value.trim();
+        const type = document.getElementById('exType').value;
+        const typeNameMap = { "Required": "系必修", "Elective": "系選修", "General": "通識/其他" };
+        
+        if (!code) return alert("請輸入選課代號");
+
+        // 新增規則
+        exceptionMap[code] = type;
+
+        // 更新 UI 清單
+        const list = document.getElementById('exceptionList');
+        if (list.querySelector('li').innerText === "(尚無規則)") list.innerHTML = "";
+        
+        const li = document.createElement('li');
+        li.innerHTML = `<strong>${code}</strong> ➜ ${typeNameMap[type]} <button onclick="removeException(this, '${code}')" style="margin-left:10px; cursor:pointer; color:red; border:none; background:none;">[刪除]</button>`;
+        list.appendChild(li);
+
+        // 清空輸入框
+        document.getElementById('exCode').value = "";
+
+        // 立即重新分析
+        if (parsedStudentData.length > 0) {
+            analyze();
+            alert(`規則已應用：${code} 現在視為 ${typeNameMap[type]}`);
+        }
+    }
+
+    function removeException(btn, code) {
+        delete exceptionMap[code];
+        btn.parentElement.remove();
+        if (parsedStudentData.length > 0) analyze();
+    }
+</script>
+
+</body>
+</html>
