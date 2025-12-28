@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v13.0 修復版)</title>
+    <title>東海電機畢業學分審查系統 (v14.0 增強版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary-color: #004b97; --secondary-color: #f8f9fa; --success-color: #198754; --danger-color: #dc3545; --warning-color: #ffc107; }
+        :root { --primary-color: #004b97; --secondary-color: #f8f9fa; --success-color: #198754; --danger-color: #dc3545; --warning-color: #ffc107; --info-color: #0dcaf0; }
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
@@ -29,6 +29,7 @@
 
         button.btn { padding: 10px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.2s; }
         button.btn:hover { background-color: #003366; }
+        button.btn-print { background-color: #6c757d; margin-left: 10px; }
         button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; }
 
         /* 儀表板 */
@@ -42,6 +43,7 @@
         .status-ok { background-color: var(--success-color); }
         .status-ng { background-color: var(--danger-color); }
         .status-warn { background-color: var(--warning-color); color: #333; }
+        .status-info { background-color: var(--info-color); color: #fff; }
 
         /* 表格樣式 */
         table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 15px; border-radius: 8px; overflow: hidden; }
@@ -72,16 +74,31 @@
         /* 管理者面板 */
         #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
+
+        /* 列印樣式 */
+        @media print {
+            .control-panel, .status-bar, .back-to-top, .btn, #admin-panel { display: none !important; }
+            .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
+            body { background: white; -webkit-print-color-adjust: exact; }
+            .dash-card { border: 1px solid #999; break-inside: avoid; }
+            h1 { font-size: 24px; margin-bottom: 10px; }
+            .category-header { margin-top: 30px; page-break-after: avoid; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+        }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v13.0 修復版)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v14.0 增強版)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
-        <button class="btn btn-admin" onclick="toggleAdmin()">🔧 管理者模式</button>
+        <div>
+            <button class="btn btn-admin" onclick="window.print()">🖨️ 列印報告</button>
+            <button class="btn btn-admin" onclick="toggleAdmin()">🔧 管理者模式</button>
+        </div>
     </div>
 
     <div class="control-panel">
@@ -109,7 +126,7 @@
             </div>
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援格式：.xlsx, .csv。請勾選上方門檻以更新儀表板狀態。
+                支援格式：.xlsx, .xls, .csv。系統將自動過濾重複修課紀錄，取最高分計算。
             </div>
         </div>
     </div>
@@ -148,11 +165,12 @@
                 <div class="dash-sub">已修門數: <span id="genEdCount">0</span></div>
             </div>
 
-            <div class="dash-card" style="background:#f0f8ff;">
-                <div class="dash-title">畢業門檻 <span id="thresholdStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-sub" style="font-size: 14px; margin-top: 10px;">
-                    <div id="peStatusText">體育門檻：❌</div>
-                    <div id="laborStatusText" style="margin-top:5px;">勞作教育：❌</div>
+            <div class="dash-card" style="background:#e3f2fd; border-color: #90caf9;">
+                <div class="dash-title">平均績點 (GPA) <span class="dash-status status-info">參考</span></div>
+                <div class="dash-value" id="gpaValue">0.00</div>
+                <div class="dash-sub" style="font-size:12px; color:#555;">
+                    採計課程數: <span id="gpaCount">0</span> 門<br>
+                    (僅計算有分數之課程)
                 </div>
             </div>
 
@@ -160,6 +178,14 @@
                 <div class="dash-title">畢業總學分 <span id="gradStatus" class="dash-status status-ng">未滿</span></div>
                 <div class="dash-value"><span id="totalCred">0</span> <span style="font-size:16px; color:#999;">/ 128</span></div>
                 <div class="dash-sub">一般選修: <span id="genElecCred">0</span> 學分</div>
+            </div>
+            
+            <div class="dash-card" style="background:#f0f8ff;">
+                <div class="dash-title">畢業門檻 <span id="thresholdStatus" class="dash-status status-ng">未完成</span></div>
+                <div class="dash-sub" style="font-size: 14px; margin-top: 10px;">
+                    <div id="peStatusText">體育門檻：❌</div>
+                    <div id="laborStatusText" style="margin-top:5px;">勞作教育：❌</div>
+                </div>
             </div>
         </div>
 
@@ -240,6 +266,14 @@
         "114": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES }
     };
 
+    // GPA 對照表
+    const GRADE_POINTS = {
+        "A+": 4.3, "A": 4.0, "A-": 3.7,
+        "B+": 3.3, "B": 3.0, "B-": 2.7,
+        "C+": 2.3, "C": 2.0, "C-": 1.7,
+        "D": 1.0, "E": 0, "F": 0, "X": 0
+    };
+
     let parsedStudentData = [];
     let exceptionMap = {}; 
     let courseDatabase = {}; 
@@ -284,42 +318,44 @@
         }
     }
 
-    // --- 3. 檔案讀取 (修正核心：使用 readAsArrayBuffer) ---
+    // --- 3. 檔案讀取 (修復核心：正確處理 Binary String) ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
         if (!file) { alert("請先選擇檔案！"); return; }
 
         const reader = new FileReader();
+        const fname = file.name.toLowerCase();
+
         reader.onload = function(e) {
-            const data = e.target.result;
-            const fname = file.name.toLowerCase(); // 忽略大小寫
-            
-            if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
-                try {
-                    // 修正：使用 type: 'array'
+            try {
+                if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
+                    // 修復：使用 Uint8Array 確保 SheetJS 能正確讀取 ArrayBuffer
+                    const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
                     parsedStudentData = normalizeData(jsonData);
-                    analyze();
-                } catch (err) { 
-                    console.error(err);
-                    alert("Excel 讀取失敗: " + err.message); 
+                } else {
+                    // CSV 處理保持原樣 (因為通常使用 text 讀取)
+                    // 但這裡因為是用 ArrayBuffer 讀的，需轉換
+                    const textDecoder = new TextDecoder("utf-8"); // 假設是 UTF-8
+                    const text = textDecoder.decode(e.target.result);
+                    parsedStudentData = parseCSV(text);
                 }
-            } else {
-                // CSV 仍使用 text
-                parsedStudentData = parseCSV(data);
+                
+                // 資料前處理：去重複 (取最高分)
+                parsedStudentData = deduplicateData(parsedStudentData);
+                
                 analyze();
+            } catch (err) { 
+                console.error(err);
+                alert("檔案讀取失敗: " + err.message + "\n請確認檔案未損壞且格式正確。"); 
             }
         };
 
-        const fname = file.name.toLowerCase();
-        if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
-            reader.readAsArrayBuffer(file); // 修正：使用 ArrayBuffer
-        } else {
-            reader.readAsText(file);
-        }
+        // 統一使用 ArrayBuffer 讀取，相容性最好
+        reader.readAsArrayBuffer(file); 
     }
 
     function normalizeData(jsonData) {
@@ -330,16 +366,23 @@
             name: String(row['科目名稱'] || row['name'] || "").trim(),
             credit: parseFloat(row['學分'] || row['credits'] || 0),
             gpa: String(row['GPA'] || row['gpa'] || "").trim()
-        })).filter(item => item.name);
+        })).filter(item => item.name); // 過濾掉空行
     }
 
     function parseCSV(text) {
         const lines = text.split('\n');
         const result = [];
-        for (let i = 1; i < lines.length; i++) {
+        // 簡單判斷是否有標題列 (檢查第一行是否有 "學期" 或 "name")
+        let startIndex = 0;
+        if (lines[0].includes("學期") || lines[0].toLowerCase().includes("semester")) {
+            startIndex = 1;
+        }
+
+        for (let i = startIndex; i < lines.length; i++) {
             const line = lines[i].trim();
             if(!line) continue;
             const cols = line.split(',');
+            // 容錯：CSV 格式可能不同，這裡假設是使用者提供的格式：學年度,學期,選課代號,科目名稱,學分,GPA
             if (cols.length >= 6) {
                 result.push({
                     year: cols[0].trim(),
@@ -352,6 +395,42 @@
             }
         }
         return result;
+    }
+
+    // --- 3.1 去重複邏輯 (新功能) ---
+    function deduplicateData(data) {
+        // 使用 Map 以 (課程名稱 + 學分數) 為 Key，避免同名但不同學分的課混淆
+        // 策略：如果重複，保留有點數(GPA Point)較高的，若相同則保留較新的
+        const map = new Map();
+
+        data.forEach(item => {
+            const normName = normalizeName(item.name);
+            const key = normName; // 簡化：同名課程視為同一門 (無論學分，通常學分變動不大，若有變動通常視為重修)
+            
+            const itemPoint = getGradePoint(item.gpa);
+            
+            if (map.has(key)) {
+                const exist = map.get(key);
+                const existPoint = getGradePoint(exist.gpa);
+                
+                // 如果目前的成績點數較高，或者點數相同但學期較新(這部分可選)，則替換
+                if (itemPoint > existPoint) {
+                    map.set(key, item);
+                } else if (itemPoint === existPoint) {
+                    // 分數相同，保留原本的 (或可根據學年替換)
+                    // 這裡不動作
+                }
+            } else {
+                map.set(key, item);
+            }
+        });
+
+        // 轉回陣列並保留原始順序 (選擇性，這裡重新排序可能更好閱讀)
+        return Array.from(map.values()).sort((a,b) => (a.year - b.year) || (a.sem - b.sem));
+    }
+
+    function getGradePoint(grade) {
+        return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1; // -1 代表無法計算或不及格的特殊標記
     }
 
     // --- 4. 核心邏輯 ---
@@ -379,12 +458,9 @@
 
     function isDeptElective(name, credit) {
         const n = normalizeName(name);
-        
         if (DEPT_ELECTIVE_WHITELIST.some(w => n.includes(normalizeName(w)))) return true;
-
         let hasKeyword = DEPT_KEYWORDS.some(k => n.includes(k));
         if (credit >= 3 && hasKeyword) return true;
-        
         return false;
     }
 
@@ -407,10 +483,23 @@
 
         let lists = { basic: [], req: [], deptElec: [], deptElecLab: [], genElec: [], genEd: [], fail: [] };
         let reqCheckList = rule.required.map(r => ({ name: r, matched: false, log: null }));
+        
+        // GPA 計算變數
+        let totalPoints = 0;
+        let totalGpaCredits = 0;
 
         parsedStudentData.forEach(rec => {
             const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '抵免', '通過'];
+            
+            // 計算 GPA (排除抵免、通過、及格不計分等)
+            const pts = getGradePoint(rec.gpa);
+            if (pts >= 0) { // 只有 A~F 才有分數
+                totalPoints += pts * rec.credit;
+                totalGpaCredits += rec.credit;
+            }
+
             if (!passGrades.includes(rec.gpa)) {
+                // 如果是不及格，且不是 D (東海 D 為 50-59 分，通常是不及格，除非通識有特殊規定，這裡統一視為不及格)
                 lists.fail.push(rec);
                 return;
             }
@@ -439,6 +528,7 @@
                         if (isGeneralEd(rec.name)) cat = "GenEd";
                         else {
                             const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
+                            // 排除特定必修名字像實驗的
                             const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("電子學") || rec.name.includes("實務探索");
                             
                             if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
@@ -461,17 +551,20 @@
             }
             else if (cat === "Required") { lists.req.push(rec); stats.req.cred += rec.credit; stats.req.count++; }
             else if (cat === "DeptElective") { lists.deptElec.push(rec); stats.deptElec.cred += rec.credit; stats.deptElec.count++; }
-            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; }
+            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } // 實驗學分算入系選修總分
             else if (cat === "GenEd") { lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; }
             else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
         });
 
-        updateDashboard(stats, target, reqCheckList);
+        // 計算最終 GPA
+        const finalGpa = totalGpaCredits > 0 ? (totalPoints / totalGpaCredits).toFixed(2) : "0.00";
+
+        updateDashboard(stats, target, reqCheckList, finalGpa, totalGpaCredits);
         renderTables(lists, reqCheckList);
     }
 
     // --- 5. 更新儀表板 ---
-    function updateDashboard(stats, target, reqCheckList) {
+    function updateDashboard(stats, target, reqCheckList, gpa, gpaCount) {
         document.getElementById('result-section').classList.remove('hidden');
 
         updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
@@ -500,6 +593,10 @@
         document.getElementById('labStatusText').innerHTML = `實驗課: ${labCount} 門 (需 >= 1) ${labCount >= 1 ? '✅' : '❌'}`;
 
         updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
+
+        // GPA 更新
+        document.getElementById('gpaValue').innerText = gpa;
+        document.getElementById('gpaCount').innerText = gpaCount;
 
         const peOk = document.getElementById('chkPE').checked;
         const laborOk = document.getElementById('chkLabor').checked;
@@ -574,7 +671,7 @@
         html += backLink;
 
         if (lists.fail.length > 0) {
-            html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格</h3>${renderSimpleTable(lists.fail)}`;
+            html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格 / 未通過</h3>${renderSimpleTable(lists.fail)}`;
             html += backLink;
         }
 
@@ -583,8 +680,10 @@
 
     function renderSimpleTable(list) {
         if (list.length === 0) return "<p style='color:#999; margin-left:15px;'>無資料</p>";
-        let h = `<table><thead><tr><th>科目名稱</th><th>學分</th><th>成績</th></tr></thead><tbody>`;
-        list.forEach(c => h += `<tr><td class="course-name" style="padding-left:20px;">${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`);
+        // 按照學年學期排序
+        list.sort((a,b) => (a.year - b.year) || (a.sem - b.sem));
+        let h = `<table><thead><tr><th width="15%">學期</th><th width="55%">科目名稱</th><th width="15%">學分</th><th width="15%">成績</th></tr></thead><tbody>`;
+        list.forEach(c => h += `<tr><td>${c.year}-${c.sem}</td><td class="course-name" style="padding-left:20px;">${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`);
         h += `</tbody></table>`;
         return h;
     }
