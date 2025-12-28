@@ -3,10 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v14.0 增強版)</title>
+    <title>東海電機畢業學分審查系統 (v14.0 完整修復版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary-color: #004b97; --secondary-color: #f8f9fa; --success-color: #198754; --danger-color: #dc3545; --warning-color: #ffc107; --info-color: #0dcaf0; }
+        :root { 
+            --primary-color: #004b97; 
+            --secondary-color: #f8f9fa; 
+            --success-color: #198754; 
+            --danger-color: #dc3545; 
+            --warning-color: #ffc107; 
+            --info-color: #0dcaf0; 
+        }
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
@@ -75,7 +82,7 @@
         #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
 
-        /* 列印樣式 */
+        /* 列印樣式 (新增) */
         @media print {
             .control-panel, .status-bar, .back-to-top, .btn, #admin-panel { display: none !important; }
             .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
@@ -91,7 +98,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v14.0 增強版)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v14.0)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -266,7 +273,7 @@
         "114": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES }
     };
 
-    // GPA 對照表
+    // GPA 對照表 (東海制)
     const GRADE_POINTS = {
         "A+": 4.3, "A": 4.0, "A-": 3.7,
         "B+": 3.3, "B": 3.0, "B-": 2.7,
@@ -337,8 +344,7 @@
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
                     parsedStudentData = normalizeData(jsonData);
                 } else {
-                    // CSV 處理保持原樣 (因為通常使用 text 讀取)
-                    // 但這裡因為是用 ArrayBuffer 讀的，需轉換
+                    // CSV 處理: 雖然是 ArrayBuffer 但需轉回文字
                     const textDecoder = new TextDecoder("utf-8"); // 假設是 UTF-8
                     const text = textDecoder.decode(e.target.result);
                     parsedStudentData = parseCSV(text);
@@ -354,7 +360,7 @@
             }
         };
 
-        // 統一使用 ArrayBuffer 讀取，相容性最好
+        // 統一使用 ArrayBuffer 讀取，相容性最好 (修正原本文字讀取的錯誤)
         reader.readAsArrayBuffer(file); 
     }
 
@@ -372,7 +378,7 @@
     function parseCSV(text) {
         const lines = text.split('\n');
         const result = [];
-        // 簡單判斷是否有標題列 (檢查第一行是否有 "學期" 或 "name")
+        // 簡單判斷是否有標題列
         let startIndex = 0;
         if (lines[0].includes("學期") || lines[0].toLowerCase().includes("semester")) {
             startIndex = 1;
@@ -382,7 +388,6 @@
             const line = lines[i].trim();
             if(!line) continue;
             const cols = line.split(',');
-            // 容錯：CSV 格式可能不同，這裡假設是使用者提供的格式：學年度,學期,選課代號,科目名稱,學分,GPA
             if (cols.length >= 6) {
                 result.push({
                     year: cols[0].trim(),
@@ -399,13 +404,11 @@
 
     // --- 3.1 去重複邏輯 (新功能) ---
     function deduplicateData(data) {
-        // 使用 Map 以 (課程名稱 + 學分數) 為 Key，避免同名但不同學分的課混淆
-        // 策略：如果重複，保留有點數(GPA Point)較高的，若相同則保留較新的
         const map = new Map();
 
         data.forEach(item => {
             const normName = normalizeName(item.name);
-            const key = normName; // 簡化：同名課程視為同一門 (無論學分，通常學分變動不大，若有變動通常視為重修)
+            const key = normName; // 以標準化課名為鍵
             
             const itemPoint = getGradePoint(item.gpa);
             
@@ -413,24 +416,31 @@
                 const exist = map.get(key);
                 const existPoint = getGradePoint(exist.gpa);
                 
-                // 如果目前的成績點數較高，或者點數相同但學期較新(這部分可選)，則替換
+                // 邏輯：保留成績較高的那一次 (例如重修過)
                 if (itemPoint > existPoint) {
                     map.set(key, item);
-                } else if (itemPoint === existPoint) {
-                    // 分數相同，保留原本的 (或可根據學年替換)
-                    // 這裡不動作
+                } 
+                // 若成績相同，保留較新的 (學年+學期比較)
+                else if (itemPoint === existPoint) {
+                    const itemSemVal = parseInt(item.year)*10 + (item.sem==='上'?1:2);
+                    const existSemVal = parseInt(exist.year)*10 + (exist.sem==='上'?1:2);
+                    if (itemSemVal > existSemVal) map.set(key, item);
                 }
             } else {
                 map.set(key, item);
             }
         });
 
-        // 轉回陣列並保留原始順序 (選擇性，這裡重新排序可能更好閱讀)
-        return Array.from(map.values()).sort((a,b) => (a.year - b.year) || (a.sem - b.sem));
+        // 轉回陣列並依照學年學期排序
+        return Array.from(map.values()).sort((a,b) => {
+             const va = parseInt(a.year)*10 + (a.sem==='上'?1:2);
+             const vb = parseInt(b.year)*10 + (b.sem==='上'?1:2);
+             return va - vb;
+        });
     }
 
     function getGradePoint(grade) {
-        return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1; // -1 代表無法計算或不及格的特殊標記
+        return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1;
     }
 
     // --- 4. 核心邏輯 ---
@@ -493,13 +503,13 @@
             
             // 計算 GPA (排除抵免、通過、及格不計分等)
             const pts = getGradePoint(rec.gpa);
-            if (pts >= 0) { // 只有 A~F 才有分數
+            if (pts >= 0) { 
                 totalPoints += pts * rec.credit;
                 totalGpaCredits += rec.credit;
             }
 
             if (!passGrades.includes(rec.gpa)) {
-                // 如果是不及格，且不是 D (東海 D 為 50-59 分，通常是不及格，除非通識有特殊規定，這裡統一視為不及格)
+                // 不及格
                 lists.fail.push(rec);
                 return;
             }
@@ -551,7 +561,7 @@
             }
             else if (cat === "Required") { lists.req.push(rec); stats.req.cred += rec.credit; stats.req.count++; }
             else if (cat === "DeptElective") { lists.deptElec.push(rec); stats.deptElec.cred += rec.credit; stats.deptElec.count++; }
-            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } // 實驗學分算入系選修總分
+            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } 
             else if (cat === "GenEd") { lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; }
             else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
         });
