@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v4.0 嚴格版)</title>
+    <title>東海電機畢業學分審查系統 (v5.0 完整版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary-color: #004b97; --secondary-color: #f1f3f5; --header-bg: #004b97; --text-color: #333; }
@@ -49,7 +49,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v4.0 嚴格版)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v5.0 完整版)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -119,7 +119,7 @@
             <select id="exType" style="padding: 8px;">
                 <option value="Required">強制設為：系必修</option>
                 <option value="Basic">強制設為：基礎課程</option>
-                <option value="Elective">強制設為：系選修</option>
+                <option value="Elective">強制設為：其他選修(系)</option>
                 <option value="ElectiveLab">強制設為：系選修實驗</option>
                 <option value="General">強制設為：通識</option>
             </select>
@@ -137,16 +137,15 @@
 
 <script>
     // --- 1. 定義規則 (RULES) ---
-    // 規則說明：
-    // 1. 必修名稱必須 "一模一樣" (程式碼中會進行全形半形標準化後的精確比對)
-    // 2. 112年"後" (113+) 移除軟體實習。112年依 PDF 仍保留。
+    // 必修名稱嚴格比對
+    // 112+學年度移除軟體實習
     
     const BASE_BASIC_COURSES = [
         "中文", "大一英文", "大二英文", "大一體育", "大二體育", 
         "全民國防教育", "勞作教育", "AI思維與程式設計", "程式思維與生成式AI"
     ];
 
-    const BASE_REQUIRED_COURSES = [
+    const CORE_REQUIRED_COURSES = [
         "微積分甲〈一〉", "普通物理", "程式設計", "邏輯設計", "線性代數", 
         "邏輯設計實驗", "微積分甲〈二〉", "程式語言", 
         "工程數學（Ⅰ）", "工程數學（Ⅱ）", 
@@ -156,41 +155,44 @@
         "專題研究", "專題實作"
     ];
 
-    // 軟體實習課程 (111, 112 適用)
     const SOFT_LABS = ["工程數學軟體實習", "電子電路軟體實習", "系統軟體實習"];
+
+    // 必修白名單 (特定系選修)
+    const DEPT_ELECTIVE_WHITELIST = [
+        "Python程式設計", 
+        "數位系統雛型設計"
+    ];
 
     const RULES = {
         "111": {
             basic: [...BASE_BASIC_COURSES],
-            required: [...BASE_REQUIRED_COURSES, ...SOFT_LABS]
+            required: [...CORE_REQUIRED_COURSES, ...SOFT_LABS]
         },
         "112": {
-            // 依據 112.pdf，該年度仍包含軟體實習
             basic: [...BASE_BASIC_COURSES],
-            required: [...BASE_REQUIRED_COURSES, ...SOFT_LABS]
+            required: [...CORE_REQUIRED_COURSES]
         },
         "113": {
-            // 112年之後(即113起) 移除軟體實習
             basic: [...BASE_BASIC_COURSES],
-            required: [...BASE_REQUIRED_COURSES]
+            required: [...CORE_REQUIRED_COURSES]
         },
         "114": {
             basic: [...BASE_BASIC_COURSES],
-            required: [...BASE_REQUIRED_COURSES]
+            required: [...CORE_REQUIRED_COURSES]
         }
     };
 
     // --- 全域變數 ---
-    let courseDatabase = {}; // 用於查詢開課單位 (系選修判斷用)
+    let courseDatabase = {};
     let parsedStudentData = [];
-    let exceptionMap = {}; // 管理者例外
+    let exceptionMap = {};
     let isDbLoaded = false;
 
-    // --- 2. 系統初始化 & 資料讀取 ---
+    // --- 2. 系統初始化 ---
     window.onload = async function() {
         const dbStatus = document.getElementById('dbStatus');
         
-        // 自動載入 ./COURSE/ 資料夾中的 JSON
+        // 嘗試自動載入 COURSE 資料夾
         const years = [111, 112, 113, 114];
         const sems = [1, 2];
         const systems = ['A', 'M']; 
@@ -226,8 +228,8 @@
             dbStatus.innerText = `✅ 系統就緒 (已載入 ${successCount} 個開課檔)`;
             dbStatus.className = "status-ready";
         } else {
-            dbStatus.innerText = "⚠️ 未偵測到開課檔 (將僅依賴名稱判斷)";
-            dbStatus.className = "status-loading"; // 保持警告色
+            dbStatus.innerText = "⚠️ 未偵測到開課檔 (將依賴名稱與白名單判斷)";
+            dbStatus.className = "status-loading"; 
         }
     };
 
@@ -236,13 +238,12 @@
             const c = json[key];
             const code = c.selection_id || c.course_code;
             if (code) {
-                // 建立索引: 年-學期-代碼
                 courseDatabase[`${year}-${sem}-${code}`] = c;
             }
         }
     }
 
-    // --- 3. 檔案上傳與解析 (支援 Excel) ---
+    // --- 3. 檔案上傳與解析 ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
@@ -277,7 +278,6 @@
     }
 
     function normalizeData(jsonData) {
-        // 相容不同表頭
         return jsonData.map(row => ({
             year: String(row['學年度'] || row['year'] || "").trim(),
             sem: String(row['學期'] || row['semester'] || "").trim(),
@@ -285,7 +285,7 @@
             name: String(row['科目名稱'] || row['name'] || "").trim(),
             credit: parseFloat(row['學分'] || row['credits'] || 0),
             gpa: String(row['GPA'] || row['gpa'] || "").trim()
-        })).filter(item => item.name); // 過濾空行
+        })).filter(item => item.name);
     }
 
     function parseCSV(text) {
@@ -309,36 +309,23 @@
         return result;
     }
 
-    // --- 4. 核心分析邏輯 (更新版) ---
-    
-    // 名稱標準化：去除全形空白、轉全形括號為半形，以利"一模一樣"比對
+    // --- 4. 核心分析邏輯 ---
     function normalizeName(name) {
         if (!name) return "";
         let s = name.trim();
         s = s.replace(/（/g, "(").replace(/）/g, ")");
         s = s.replace(/〈/g, "(").replace(/〉/g, ")");
-        s = s.replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II"); // 統一羅馬數字 (選用)
-        // 注意：為了嚴格比對，這裡我們只做括號標準化，不做模糊刪減
+        s = s.replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II"); 
         return s;
     }
 
-    // 為了比對 RULES 裡的名稱，也需要做同樣處理
-    // 但是 RULES 裡的名稱是我們寫死的，我們可以確保 RULES 裡的寫法是標準的
-    // 不過為了保險，比對時兩邊都 normalize
     function isSameName(studentName, ruleName) {
-        // 特殊處理：使用 includes ? 不，使用者說 "一定要一模一樣"
-        // 但是 CSV 中的 "微積分甲〈一〉" 可能會是 "微積分甲(一)"
-        // 所以符號轉換是必須的
         const n1 = normalizeName(studentName);
         const n2 = normalizeName(ruleName);
-        // 使用者說 "一模一樣"，但通常 "中文" 課名會有 "中文：文學..."
-        // 對於 "基礎課程" (Basic)，我們允許前綴 (如 "大一體育" 可能有分項)
-        // 對於 "必修課程" (Required)，使用者強調 "一模一樣"。
         return n1 === n2; 
     }
 
     function isBasicCourse(name, basicList) {
-        // 基礎課程判定：允許部分包含，因為像 "大一體育：籃球"
         const n = normalizeName(name);
         for (let b of basicList) {
             const nb = normalizeName(b);
@@ -348,10 +335,7 @@
     }
 
     function isGeneralCourse(name) {
-        // 通識判定：依據前綴
         const prefixes = ["人文", "社會", "自然", "永續", "文明", "領導", "議題"];
-        // 檢查是否以 "人文：" 或 "人文領域" 開頭
-        // CSV 範例： "人文：日本..."
         for (let p of prefixes) {
             if (name.startsWith(p + "：") || name.startsWith(p + ":") || name.includes(p + "領域")) return true;
         }
@@ -364,26 +348,22 @@
         const year = document.getElementById('admissionYear').value;
         const rule = RULES[year];
         
-        // 統計容器
         let credits = { basic: 0, req: 0, elec: 0, gen: 0, total: 0 };
         let resultLists = { 
             basic: [], 
             req: [], 
-            elec: [], // 一般系選修
+            elec: [], // 其他選修 (系選修正課)
             elecLab: [], // 系選修實驗
             gen: [], 
             fail: [] 
         };
 
-        // 必修檢查清單 (深拷貝)
         let reqCheckList = rule.required.map(rName => ({ name: rName, matched: false, log: null }));
 
         parsedStudentData.forEach(record => {
-            // 1. 及格判定 (D 不及格)
+            // 及格判斷 (D不及格)
             const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-'];
             const isPass = passGrades.includes(record.gpa);
-            
-            // 學期轉換
             let semDigit = record.sem === '上' ? '1' : (record.sem === '下' ? '2' : record.sem);
 
             if (!isPass) {
@@ -391,16 +371,13 @@
                 return;
             }
 
-            // 2. 分類邏輯
             let category = "Unknown";
             let matchedReq = false;
 
             // (A) 管理者例外
             if (exceptionMap[record.code]) {
                 category = exceptionMap[record.code];
-                // 如果是必修，需標記 Checklist
                 if (category === 'Required') {
-                    // 嘗試找對應的必修名稱 (如果有的話)
                     for (let r of reqCheckList) {
                         if (!r.matched && isSameName(record.name, r.name)) {
                             r.matched = true; r.log = record; break;
@@ -409,11 +386,11 @@
                 }
             } 
             else {
-                // (B) 基礎課程 (Basic)
+                // (B) 基礎課程
                 if (isBasicCourse(record.name, rule.basic)) {
                     category = "Basic";
                 }
-                // (C) 系必修 (Dept Required) - 嚴格比對
+                // (C) 系必修 (嚴格比對)
                 else {
                     for (let r of reqCheckList) {
                         if (!r.matched && isSameName(record.name, r.name)) {
@@ -426,39 +403,49 @@
                     }
                     
                     if (!matchedReq) {
-                        // (D) 通識 (General) - 前綴判定
+                        // (D) 通識 (前綴判斷)
                         if (isGeneralCourse(record.name)) {
                             category = "General";
                         }
-                        // (E) 系選修 (Dept Elective)
+                        // (E) 系選修
                         else {
-                            // 判定邏輯：
-                            // 1. 查詢 DB 是否為電機系 (假設代碼 36 或 opened_by_dept 包含特定 ID)
-                            // 2. 若無 DB，依據排除法 + 關鍵字
-                            // 這裡我們假設非上述類別，且看起來不像外系課 (通識已排除) 則為系選修
-                            // 為了更精確，我們檢查 DB
-                            const dbKey = `${record.year}-${semDigit}-${record.code}`;
-                            const courseInfo = courseDatabase[dbKey];
-                            
-                            // 簡單判斷：若不是通識、不是基礎、不是必修，暫定為系選修
-                            // 更細分：系選修實驗 vs 系選修
-                            category = "Elective"; 
+                            // 判斷是否為「其他選修」(原: 一般系選修)
+                            // 優先檢查白名單
+                            let isWhitelisted = false;
+                            for (let w of DEPT_ELECTIVE_WHITELIST) {
+                                if (record.name.includes(w)) {
+                                    isWhitelisted = true;
+                                    break;
+                                }
+                            }
+
+                            if (isWhitelisted) {
+                                category = "Elective";
+                            } else {
+                                // 預設為系選修
+                                category = "Elective"; 
+                            }
                         }
                     }
                 }
             }
 
-            // (F) 細分系選修：是否為實驗課
-            // 條件：類別是 Elective 且 (學分==1 且 課名含"實驗"或"實作")
+            // (F) 細分系選修：實驗 vs 其他選修
+            // 修正邏輯：即使是1學分+實作，如果是特定課程(如工程數學實作)，應歸類為"其他選修"而非"實驗"
             if (category === "Elective" || category === "ElectiveLab") {
-                if (record.credit === 1 && (record.name.includes("實驗") || record.name.includes("實作"))) {
+                const isLabKeyword = record.name.includes("實驗") || record.name.includes("實作");
+                
+                // 排除列表：這些課雖然有"實作"且1學分，但使用者定義為"其他選修"
+                const excludeFromLab = record.name.includes("工程數學") || record.name.includes("電路學") || record.name.includes("實務探索");
+
+                if (record.credit === 1 && isLabKeyword && !excludeFromLab) {
                     category = "ElectiveLab";
                 } else {
-                    category = "Elective";
+                    category = "Elective"; // 歸類為 其他選修
                 }
             }
 
-            // 3. 歸檔與加總
+            // 歸檔
             if (category === "Basic") {
                 resultLists.basic.push(record);
                 credits.basic += record.credit;
@@ -470,13 +457,11 @@
                 credits.elec += record.credit;
             } else if (category === "ElectiveLab") {
                 resultLists.elecLab.push(record);
-                credits.elec += record.credit; // 實驗也算系選修學分
+                credits.elec += record.credit; // 實驗併入系選修總分
             } else if (category === "General") {
                 resultLists.gen.push(record);
                 credits.gen += record.credit;
             } else {
-                // 未知歸類 (可能是外系選修，暫歸系選修或顯示為其他)
-                // 這裡暫歸系選修，以免漏算
                 resultLists.elec.push(record);
                 credits.elec += record.credit;
             }
@@ -490,7 +475,6 @@
     function updateUI(credits, lists, reqCheckList) {
         document.getElementById('result-section').classList.remove('hidden');
         
-        // 更新數據卡片
         document.getElementById('basicCredits').innerText = credits.basic;
         document.getElementById('reqCredits').innerText = credits.req;
         document.getElementById('elecCredits').innerText = credits.elec;
@@ -503,7 +487,7 @@
         const container = document.getElementById('tables-container');
         let html = "";
 
-        // 1. 基礎課程
+        // 1. 基礎
         html += `<h3 class="category-header">1. 基礎課程 (Basic Courses)</h3>`;
         html += renderSimpleTable(lists.basic);
 
@@ -517,7 +501,8 @@
             const detail = r.log ? `${r.log.name} (${r.log.gpa})` : "-";
             html += `<tr>
                 <td style="text-align:left; padding-left:20px;">${r.name}</td>
-                <td>-</td> <td>${status}</td>
+                <td>-</td> 
+                <td>${status}</td>
                 <td style="text-align:left;">${detail}</td>
             </tr>`;
         });
@@ -527,15 +512,14 @@
         html += `<h3 class="category-header">3. 通識課程 (General Education)</h3>`;
         html += renderSimpleTable(lists.gen);
 
-        // 4. 系選修 (分兩類)
+        // 4. 系選修
         html += `<h3 class="category-header">4. 系選修 (Department Elective)</h3>`;
         
-        // 4-1 實驗
         html += `<div class="sub-category">▶ 系選修實驗 (Laboratory / 1學分)</div>`;
         html += renderSimpleTable(lists.elecLab);
         
-        // 4-2 一般系選修
-        html += `<div class="sub-category">▶ 一般系選修</div>`;
+        // 名稱調整：一般系選修 -> 其他選修
+        html += `<div class="sub-category">▶ 其他選修 (Other Elective)</div>`;
         html += renderSimpleTable(lists.elec);
 
         // 5. 不及格
@@ -547,7 +531,6 @@
         container.innerHTML = html;
     }
 
-    // 簡化版表格 (不顯示代碼、學期)
     function renderSimpleTable(list) {
         if (list.length === 0) return "<p style='color:#999; margin-left:10px;'>無課程資料</p>";
         let h = `<table><thead><tr>
@@ -586,7 +569,7 @@
         const type = document.getElementById('exType').value;
         const typeNames = { 
             "Required": "系必修", "Basic": "基礎課程", 
-            "Elective": "系選修", "ElectiveLab": "系選修實驗", "General": "通識" 
+            "Elective": "其他選修(系)", "ElectiveLab": "系選修實驗", "General": "通識" 
         };
         
         if (!code) return alert("請輸入選課代號");
