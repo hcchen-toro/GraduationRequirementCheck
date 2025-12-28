@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v12.0 by HC)</title>
+    <title>東海電機畢業學分審查系統 (v13.0 修復版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary-color: #004b97; --secondary-color: #f8f9fa; --success-color: #198754; --danger-color: #dc3545; --warning-color: #ffc107; }
@@ -33,7 +33,7 @@
 
         /* 儀表板 */
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .dash-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; cursor: pointer; /* 新增手指游標 */ }
+        .dash-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; cursor: pointer; }
         .dash-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: var(--primary-color); }
         .dash-title { font-size: 16px; font-weight: bold; color: #555; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
         .dash-value { font-size: 28px; font-weight: bold; color: var(--primary-color); }
@@ -77,7 +77,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v12.0)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v13.0 修復版)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -194,7 +194,6 @@
 
 <script>
     // --- 1. 規則定義 (RULES) ---
-    // 目標學分設定
     const CREDITS_TARGET = {
         "111": { basic: 14, req: 84, deptElec: 20, genEd: 12, total: 128 },
         "112": { basic: 14, req: 81, deptElec: 20, genEd: 12, total: 128 },
@@ -207,7 +206,6 @@
         "全民國防教育", "勞作教育", "AI思維與程式設計", "程式思維與生成式AI"
     ];
 
-    // 必修清單
     const CORE_REQUIRED_COURSES = [
         "微積分甲〈一〉", "普通物理", "程式設計", "邏輯設計", "線性代數", 
         "邏輯設計實驗", "微積分甲〈二〉", "程式語言", 
@@ -220,7 +218,6 @@
 
     const SOFT_LABS = ["工程數學軟體實習", "電子電路軟體實習", "系統軟體實習"];
 
-    // 系選修白名單
     const DEPT_ELECTIVE_WHITELIST = [
         "Python程式設計", 
         "數位系統雛型設計", 
@@ -230,7 +227,6 @@
         "生醫工程導論"
     ];
 
-    // 系選修關鍵字
     const DEPT_KEYWORDS = [
         "電子", "電機", "電路", "訊號", "系統", "半導體", "晶片", "控制", 
         "通訊", "邏輯", "微處理", "程式", "物件導向", "演算法", "人工智慧", 
@@ -251,7 +247,6 @@
     // --- 2. 初始化 ---
     window.onload = async function() {
         const dbStatus = document.getElementById('dbStatus');
-        
         const years = [111, 112, 113, 114];
         const sems = [1, 2];
         const systems = ['A', 'M']; 
@@ -289,7 +284,7 @@
         }
     }
 
-    // --- 3. 檔案讀取 ---
+    // --- 3. 檔案讀取 (修正核心：使用 readAsArrayBuffer) ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
@@ -298,22 +293,33 @@
         const reader = new FileReader();
         reader.onload = function(e) {
             const data = e.target.result;
-            if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            const fname = file.name.toLowerCase(); // 忽略大小寫
+            
+            if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
                 try {
-                    const workbook = XLSX.read(data, { type: 'binary' });
+                    // 修正：使用 type: 'array'
+                    const workbook = XLSX.read(data, { type: 'array' });
                     const sheetName = workbook.SheetNames[0];
                     const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
                     parsedStudentData = normalizeData(jsonData);
                     analyze();
-                } catch (err) { alert("Excel 讀取失敗"); }
+                } catch (err) { 
+                    console.error(err);
+                    alert("Excel 讀取失敗: " + err.message); 
+                }
             } else {
+                // CSV 仍使用 text
                 parsedStudentData = parseCSV(data);
                 analyze();
             }
         };
 
-        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) reader.readAsBinaryString(file);
-        else reader.readAsText(file);
+        const fname = file.name.toLowerCase();
+        if (fname.endsWith('.xlsx') || fname.endsWith('.xls')) {
+            reader.readAsArrayBuffer(file); // 修正：使用 ArrayBuffer
+        } else {
+            reader.readAsText(file);
+        }
     }
 
     function normalizeData(jsonData) {
@@ -374,13 +380,9 @@
     function isDeptElective(name, credit) {
         const n = normalizeName(name);
         
-        // 1. 白名單 (優先) - 即使無DB也生效
         if (DEPT_ELECTIVE_WHITELIST.some(w => n.includes(normalizeName(w)))) return true;
 
-        // 2. 關鍵字 (DB 或 名稱)
         let hasKeyword = DEPT_KEYWORDS.some(k => n.includes(k));
-        
-        // 檢查全部 CourseDB
         if (credit >= 3 && hasKeyword) return true;
         
         return false;
@@ -416,7 +418,6 @@
             let cat = "Unknown";
             const normName = normalizeName(rec.name);
 
-            // 1. 例外管理
             if (exceptionMap[normName]) {
                 cat = exceptionMap[normName];
                 if (cat === 'Required') {
@@ -426,9 +427,7 @@
                 }
             } 
             else {
-                // 2. 基礎
                 if (isBasicCourse(rec.name, rule.basic)) cat = "Basic";
-                // 3. 必修
                 else {
                     let matched = false;
                     for (let r of reqCheckList) {
@@ -437,24 +436,19 @@
                         }
                     }
                     if (!matched) {
-                        // 4. 通識
                         if (isGeneralEd(rec.name)) cat = "GenEd";
                         else {
-                            // 5. 系選修實驗
                             const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
                             const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("電子學") || rec.name.includes("實務探索");
                             
                             if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
-                            // 6. 系選修
                             else if (isDeptElective(rec.name, rec.credit)) cat = "DeptElective";
-                            // 7. 一般選修
                             else cat = "GeneralElective";
                         }
                     }
                 }
             }
 
-            // 統計與歸類
             stats.total += rec.credit;
             if (cat === "Basic") { 
                 lists.basic.push(rec); 
@@ -480,7 +474,6 @@
     function updateDashboard(stats, target, reqCheckList) {
         document.getElementById('result-section').classList.remove('hidden');
 
-        // 1. 基礎
         updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
         const d = stats.basic.details;
         const basicText = `
@@ -493,11 +486,9 @@
         basicStat.className = `dash-status ${isBasicAllPass ? 'status-ok' : 'status-ng'}`;
         basicStat.innerText = isBasicAllPass ? "已完成" : "未完成";
 
-        // 2. 必修
         document.getElementById('reqTarget').innerText = target.req;
         updateCard('req', stats.req.cred, target.req, stats.req.count, reqCheckList.length);
 
-        // 3. 系選修
         const eleCred = stats.deptElec.cred;
         const labCount = stats.deptElecLab.count;
         const eleTarget = target.deptElec; 
@@ -508,10 +499,8 @@
         eleStat.innerText = isElecPass ? "達標" : "未達標";
         document.getElementById('labStatusText').innerHTML = `實驗課: ${labCount} 門 (需 >= 1) ${labCount >= 1 ? '✅' : '❌'}`;
 
-        // 4. 通識
         updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
 
-        // 5. 門檻
         const peOk = document.getElementById('chkPE').checked;
         const laborOk = document.getElementById('chkLabor').checked;
         document.getElementById('peStatusText').innerHTML = `體育門檻：${peOk ? '✅ 通過' : '❌ 未通過'}`;
@@ -525,7 +514,6 @@
             threshStat.innerText = "未完成";
         }
 
-        // 6. 總學分
         const totalStat = document.getElementById('gradStatus');
         totalStat.className = `dash-status ${stats.total >= target.total ? 'status-ok' : 'status-ng'}`;
         totalStat.innerText = stats.total >= target.total ? "達標" : "未滿";
@@ -557,12 +545,10 @@
         const backLink = `<div class="back-to-top" onclick="scrollToId('dashboard-anchor')">↑ 回到儀表板</div>`;
         let html = "";
 
-        // 1. Basic
         html += `<h3 id="tbl-basic" class="category-header">1. 基礎課程</h3>`;
         html += renderSimpleTable(lists.basic);
         html += backLink;
 
-        // 2. Req
         html += `<h3 id="tbl-req" class="category-header">2. 學系必修科目</h3>`;
         html += `<table><thead><tr><th width="35%">必修科目名稱</th><th width="10%">學分</th><th width="15%">狀態</th><th width="40%">修課紀錄</th></tr></thead><tbody>`;
         reqCheckList.forEach(r => {
@@ -574,18 +560,15 @@
         html += `</tbody></table>`;
         html += backLink;
 
-        // 3. GenEd
         html += `<h3 id="tbl-genEd" class="category-header">3. 通識課程</h3>`;
         html += renderSimpleTable(lists.genEd);
         html += backLink;
 
-        // 4. DeptElec
         html += `<h3 id="tbl-deptElec" class="category-header">4. 系選修 (含實驗)</h3>`;
         html += `<div class="sub-category">▶ 系選修實驗 (實驗/實作)</div>${renderSimpleTable(lists.deptElecLab)}`;
         html += `<br><div class="sub-category">▶ 系選修課程</div>${renderSimpleTable(lists.deptElec)}`;
         html += backLink;
 
-        // 5. GenElec
         html += `<h3 id="tbl-genElec" class="category-header">5. 一般選修 (外系選修)</h3>`;
         html += renderSimpleTable(lists.genElec);
         html += backLink;
@@ -608,7 +591,6 @@
 
     function reAnalyzeIfReady() { if (parsedStudentData.length > 0) analyze(); }
 
-    // --- 7. 管理者功能 ---
     function toggleAdmin() {
         if (prompt("請輸入管理者密碼：") === "07160330") document.getElementById('admin-panel').style.display = 'block';
         else alert("密碼錯誤");
@@ -618,14 +600,11 @@
         const name = document.getElementById('exName').value.trim();
         const type = document.getElementById('exType').value;
         const labels = { "Required": "系必修", "Basic": "基礎", "DeptElective": "系選修", "DeptElectiveLab": "系選修實驗", "GeneralElective": "一般選修", "GenEd": "通識" };
-        
         if (!name) return alert("請輸入課名");
         const norm = normalizeName(name);
         exceptionMap[norm] = type;
-        
         const list = document.getElementById('exceptionList');
         if (list.querySelector('li')?.innerText === "(無)") list.innerHTML = "";
-        
         const li = document.createElement('li');
         li.innerHTML = `<strong>${name}</strong> ➜ ${labels[type]} <button onclick="removeEx(this, '${norm}')" style="margin-left:10px; color:red; border:none; background:none; cursor:pointer;">[刪除]</button>`;
         list.appendChild(li);
