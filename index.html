@@ -3,53 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v5.0 完整版)</title>
+    <title>東海電機畢業學分審查系統 (v7.0 儀表板升級版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary-color: #004b97; --secondary-color: #f1f3f5; --header-bg: #004b97; --text-color: #333; }
-        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f8f9fa; margin: 0; padding: 20px; color: var(--text-color); }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); border-radius: 12px; }
+        :root { --primary-color: #004b97; --secondary-color: #f8f9fa; --success-color: #198754; --danger-color: #dc3545; --warning-color: #ffc107; }
+        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 25px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
+        h1 { text-align: center; color: var(--primary-color); margin-bottom: 30px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
         
-        .status-bar { background: #e9ecef; padding: 12px; border-radius: 6px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .status-ready { color: #198754; font-weight: bold; }
+        /* 狀態列 */
+        .status-bar { background: #e9ecef; padding: 10px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
+        .status-ready { color: var(--success-color); font-weight: bold; }
         .status-loading { color: #0d6efd; font-weight: bold; }
-        
-        .control-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 25px; background: var(--secondary-color); padding: 25px; border-radius: 10px; margin-bottom: 25px; }
+
+        /* 控制面板 */
+        .control-panel { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; background: var(--secondary-color); padding: 25px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #dee2e6; }
         .input-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #495057; }
+        .input-group select, .input-group input { padding: 10px; border: 1px solid #ced4da; border-radius: 5px; width: 100%; box-sizing: border-box; }
         
         button.btn { padding: 10px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.2s; }
         button.btn:hover { background-color: #003366; }
         button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 15px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px 15px; text-align: left; }
-        th { background-color: var(--header-bg); color: white; text-align: center; }
+
+        /* 新版儀表板 */
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .dash-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; }
+        .dash-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .dash-title { font-size: 16px; font-weight: bold; color: #555; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .dash-value { font-size: 28px; font-weight: bold; color: var(--primary-color); }
+        .dash-sub { font-size: 13px; color: #777; margin-top: 5px; }
+        .dash-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; color: #fff; font-weight: bold; }
+        .status-ok { background-color: var(--success-color); }
+        .status-ng { background-color: var(--danger-color); }
+        .status-warn { background-color: var(--warning-color); color: #333; }
+
+        /* 表格樣式 */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 15px; border-radius: 8px; overflow: hidden; }
+        th, td { border: 1px solid #dee2e6; padding: 12px 15px; text-align: left; }
+        th { background-color: var(--primary-color); color: white; text-align: center; }
         td { text-align: center; }
         tr:nth-child(even) { background-color: #f8f9fa; }
         
-        .pass { color: #198754; font-weight: bold; }
-        .fail { color: #dc3545; font-weight: bold; }
-        .course-name { text-align: left; }
+        .pass { color: var(--success-color); font-weight: bold; }
+        .fail { color: var(--danger-color); font-weight: bold; }
+        .course-name { text-align: left; font-weight: 500; }
 
-        .summary-box { display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
-        .stat-card { flex: 1; min-width: 140px; background: #e3f2fd; padding: 15px; border-radius: 8px; text-align: center; border: 1px solid #90caf9; }
-        .stat-val { font-size: 26px; font-weight: bold; color: var(--primary-color); margin-top: 5px; }
-        .stat-title { font-size: 14px; color: #555; font-weight: bold; }
+        .category-header { margin-top: 50px; border-left: 5px solid var(--primary-color); padding-left: 15px; color: #333; font-size: 1.4em; }
+        .sub-category { margin-top: 20px; color: #555; font-size: 1.1em; font-weight: bold; margin-bottom: 10px; background: #e9ecef; padding: 8px 12px; border-radius: 6px; display: inline-block; }
 
-        .category-header { margin-top: 40px; border-left: 5px solid var(--primary-color); padding-left: 10px; color: #444; }
-        .sub-category { margin-top: 20px; color: #666; font-size: 1.1em; font-weight: bold; margin-bottom: 10px; }
-
-        #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; position: relative; }
-        .admin-badge { position: absolute; top: -10px; right: 10px; background: #ffc107; padding: 4px 10px; font-size: 12px; border-radius: 4px; font-weight: bold; }
+        /* 管理者面板 */
+        #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v5.0 完整版)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v7.0)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -58,8 +69,8 @@
 
     <div class="control-panel">
         <div class="input-group">
-            <label>1. 選擇入學年度 (影響必修規則)</label>
-            <select id="admissionYear" class="form-control" style="padding: 8px; width: 100%; border:1px solid #ccc; border-radius:4px;" onchange="reAnalyzeIfReady()">
+            <label>1. 選擇入學年度</label>
+            <select id="admissionYear" onchange="reAnalyzeIfReady()">
                 <option value="111">111 學年度</option>
                 <option value="112">112 學年度</option>
                 <option value="113">113 學年度</option>
@@ -69,77 +80,90 @@
 
         <div class="input-group">
             <label>2. 上傳成績單 (Excel / CSV)</label>
-            <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" style="width: 100%;" />
-            <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援 .xlsx 格式。系統將自動判讀必修、基礎、通識與系選修。
-            </div>
-            <div style="margin-top: 15px;">
+            <div style="display: flex; gap: 10px;">
+                <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" />
                 <button class="btn" onclick="processFileAndAnalyze()">開始分析</button>
+            </div>
+            <div style="font-size: 12px; color: #666; margin-top: 8px;">
+                支援格式：.xlsx, .csv。系統將依照年度規則自動審核。
             </div>
         </div>
     </div>
 
     <div id="result-section" class="hidden">
-        <div class="summary-box">
-            <div class="stat-card">
-                <div class="stat-title">必修完成率</div>
-                <div class="stat-val" id="reqRate">0%</div>
+        
+        <h3 style="color:#555; margin-bottom:15px;">📊 學分審核儀表板</h3>
+        <div class="dashboard-grid">
+            <div class="dash-card">
+                <div class="dash-title">基礎學分 <span id="basicStatus" class="dash-status status-ng">未完成</span></div>
+                <div class="dash-value"><span id="basicCred">0</span> <span style="font-size:16px; color:#999;">/ 14</span></div>
+                <div class="dash-sub">已修門數: <span id="basicCount">0</span> (目標: 中+英+程)</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">基礎學分</div>
-                <div class="stat-val" id="basicCredits">0</div>
+
+            <div class="dash-card">
+                <div class="dash-title">系必修 <span id="reqStatus" class="dash-status status-ng">未完成</span></div>
+                <div class="dash-value"><span id="reqCred">0</span> <span style="font-size:16px; color:#999;">/ <span id="reqTarget">81</span></span></div>
+                <div class="dash-sub">已修門數: <span id="reqCount">0</span> / <span id="reqTotalCount">0</span></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">系必修學分</div>
-                <div class="stat-val" id="reqCredits">0</div>
+
+            <div class="dash-card" style="border-left: 5px solid #ffc107;">
+                <div class="dash-title">系選修 (含實驗) <span id="deptElecStatus" class="dash-status status-ng">未達標</span></div>
+                <div class="dash-value"><span id="deptElecCred">0</span> <span style="font-size:16px; color:#999;">/ 20</span></div>
+                <div class="dash-sub" id="labStatusText">實驗課: 0 門 (需 >= 1) ❌</div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">系選修學分</div>
-                <div class="stat-val" id="elecCredits">0</div>
+
+            <div class="dash-card">
+                <div class="dash-title">通識學分 <span id="genEdStatus" class="dash-status status-ng">未完成</span></div>
+                <div class="dash-value"><span id="genEdCred">0</span> <span style="font-size:16px; color:#999;">/ 12</span></div>
+                <div class="dash-sub">已修門數: <span id="genEdCount">0</span></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-title">通識學分</div>
-                <div class="stat-val" id="genCredits">0</div>
-            </div>
-            <div class="stat-card" style="background: #e8f5e9; border-color:#c8e6c9;">
-                <div class="stat-title">總取得學分</div>
-                <div class="stat-val" id="totalCredits">0</div>
+
+            <div class="dash-card" style="background:#f8f9fa;">
+                <div class="dash-title">畢業總學分 <span id="gradStatus" class="dash-status status-ng">未滿</span></div>
+                <div class="dash-value"><span id="totalCred">0</span> <span style="font-size:16px; color:#999;">/ 128</span></div>
+                <div class="dash-sub">一般選修: <span id="genElecCred">0</span> 學分</div>
             </div>
         </div>
+
         <div id="tables-container"></div>
     </div>
 
     <div id="admin-panel">
-        <div class="admin-badge">Admin Mode</div>
-        <h3>例外管理控制台</h3>
-        <p>設定特殊課程歸屬 (輸入選課代號，將強制覆蓋判斷邏輯)</p>
+        <h3 style="color:#856404;">🔧 例外管理 (以課名判定)</h3>
+        <p>輸入課程名稱，強制指定其類別：</p>
         
         <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="exCode" placeholder="選課代號 (如 1091)" style="padding: 8px; width: 150px;">
+            <input type="text" id="exName" placeholder="課程名稱 (如: 數位影像處理)" style="padding: 8px; width: 250px;">
             <select id="exType" style="padding: 8px;">
                 <option value="Required">強制設為：系必修</option>
                 <option value="Basic">強制設為：基礎課程</option>
-                <option value="Elective">強制設為：其他選修(系)</option>
-                <option value="ElectiveLab">強制設為：系選修實驗</option>
-                <option value="General">強制設為：通識</option>
+                <option value="DeptElective">強制設為：系選修</option>
+                <option value="DeptElectiveLab">強制設為：系選修實驗</option>
+                <option value="GeneralElective">強制設為：一般選修</option>
+                <option value="GenEd">強制設為：通識</option>
             </select>
-            <button class="btn" style="padding: 8px 15px; font-size: 14px;" onclick="addException()">新增</button>
+            <button class="btn" onclick="addException()">新增規則</button>
         </div>
 
-        <div style="margin-top: 15px; border-top: 1px solid #ccc; padding-top: 10px;">
-            <strong>目前的例外規則：</strong>
-            <ul id="exceptionList" style="list-style: none; padding: 0; margin-top: 5px; font-size: 14px;">
-                <li style="color:#666;">(尚無規則)</li>
+        <div style="margin-top: 15px;">
+            <strong>目前規則：</strong>
+            <ul id="exceptionList" style="margin-top: 5px;">
+                <li style="color:#666;">(無)</li>
             </ul>
         </div>
     </div>
 </div>
 
 <script>
-    // --- 1. 定義規則 (RULES) ---
-    // 必修名稱嚴格比對
-    // 112+學年度移除軟體實習
-    
+    // --- 1. 規則定義 (RULES) ---
+    // 目標學分設定
+    const CREDITS_TARGET = {
+        "111": { basic: 14, req: 84, deptElec: 20, genEd: 12, total: 128 },
+        "112": { basic: 14, req: 81, deptElec: 20, genEd: 12, total: 128 },
+        "113": { basic: 14, req: 81, deptElec: 20, genEd: 12, total: 128 },
+        "114": { basic: 14, req: 81, deptElec: 20, genEd: 12, total: 128 }
+    };
+
     const BASE_BASIC_COURSES = [
         "中文", "大一英文", "大二英文", "大一體育", "大二體育", 
         "全民國防教育", "勞作教育", "AI思維與程式設計", "程式思維與生成式AI"
@@ -157,79 +181,58 @@
 
     const SOFT_LABS = ["工程數學軟體實習", "電子電路軟體實習", "系統軟體實習"];
 
-    // 必修白名單 (特定系選修)
-    const DEPT_ELECTIVE_WHITELIST = [
-        "Python程式設計", 
-        "數位系統雛型設計"
+    // 系選修白名單
+    const DEPT_ELECTIVE_WHITELIST = ["Python程式設計", "數位系統雛型設計"];
+
+    // 系選修關鍵字 (需搭配學分>=3)
+    const DEPT_KEYWORDS = [
+        "電子", "電機", "電路", "訊號", "系統", "半導體", "晶片", "控制", 
+        "通訊", "邏輯", "微處理", "程式", "物件導向", "演算法", "人工智慧", 
+        "深度學習", "積體電路", "光電", "電磁", "微波", "天線"
     ];
 
     const RULES = {
-        "111": {
-            basic: [...BASE_BASIC_COURSES],
-            required: [...CORE_REQUIRED_COURSES, ...SOFT_LABS]
-        },
-        "112": {
-            basic: [...BASE_BASIC_COURSES],
-            required: [...CORE_REQUIRED_COURSES]
-        },
-        "113": {
-            basic: [...BASE_BASIC_COURSES],
-            required: [...CORE_REQUIRED_COURSES]
-        },
-        "114": {
-            basic: [...BASE_BASIC_COURSES],
-            required: [...CORE_REQUIRED_COURSES]
-        }
+        "111": { basic: BASE_BASIC_COURSES, required: [...CORE_REQUIRED_COURSES, ...SOFT_LABS] },
+        "112": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES },
+        "113": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES },
+        "114": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES }
     };
 
-    // --- 全域變數 ---
-    let courseDatabase = {};
     let parsedStudentData = [];
-    let exceptionMap = {};
-    let isDbLoaded = false;
+    let exceptionMap = {}; 
+    let courseDatabase = {}; 
 
-    // --- 2. 系統初始化 ---
+    // --- 2. 初始化 ---
     window.onload = async function() {
         const dbStatus = document.getElementById('dbStatus');
         
-        // 嘗試自動載入 COURSE 資料夾
+        // 載入 COURSE JSON
         const years = [111, 112, 113, 114];
         const sems = [1, 2];
         const systems = ['A', 'M']; 
         let filesToFetch = [];
 
-        years.forEach(y => {
-            sems.forEach(s => {
-                systems.forEach(sys => filesToFetch.push(`${y}${s}${sys}-data.json`));
-            });
-        });
+        years.forEach(y => sems.forEach(s => systems.forEach(sys => filesToFetch.push(`${y}${s}${sys}-data.json`))));
 
         let successCount = 0;
         const requests = filesToFetch.map(fileName => 
-            fetch(`./COURSE/${fileName}`)
-                .then(res => {
-                    if(!res.ok) throw new Error("404");
-                    return res.json().then(json => ({ fileName, json }));
-                })
-                .catch(err => null)
+            fetch(`./COURSE/${fileName}`).then(res => res.ok ? res.json().then(j => ({n:fileName, j})) : null).catch(()=>null)
         );
 
         const results = await Promise.all(requests);
         results.forEach(item => {
             if (item) {
                 successCount++;
-                const match = item.fileName.match(/^(\d{3})(\d)[A-Za-z]/);
-                if (match) processJsonToDB(item.json, match[1], match[2]);
+                const m = item.n.match(/^(\d{3})(\d)[A-Za-z]/);
+                if (m) processJsonToDB(item.j, m[1], m[2]);
             }
         });
 
         if (successCount > 0) {
-            isDbLoaded = true;
             dbStatus.innerText = `✅ 系統就緒 (已載入 ${successCount} 個開課檔)`;
             dbStatus.className = "status-ready";
         } else {
-            dbStatus.innerText = "⚠️ 未偵測到開課檔 (將依賴名稱與白名單判斷)";
-            dbStatus.className = "status-loading"; 
+            dbStatus.innerText = "⚠️ 未偵測到開課檔 (將依賴名稱規則判斷)";
         }
     };
 
@@ -237,13 +240,11 @@
         for (let key in json) {
             const c = json[key];
             const code = c.selection_id || c.course_code;
-            if (code) {
-                courseDatabase[`${year}-${sem}-${code}`] = c;
-            }
+            if (code) courseDatabase[`${year}-${sem}-${code}`] = c;
         }
     }
 
-    // --- 3. 檔案上傳與解析 ---
+    // --- 3. 檔案讀取 ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
@@ -256,25 +257,18 @@
                 try {
                     const workbook = XLSX.read(data, { type: 'binary' });
                     const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
                     parsedStudentData = normalizeData(jsonData);
                     analyze();
-                } catch (err) {
-                    console.error(err);
-                    alert("Excel 讀取失敗，請確認檔案格式。");
-                }
+                } catch (err) { alert("Excel 讀取失敗"); }
             } else {
                 parsedStudentData = parseCSV(data);
                 analyze();
             }
         };
 
-        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
-            reader.readAsBinaryString(file);
-        } else {
-            reader.readAsText(file);
-        }
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) reader.readAsBinaryString(file);
+        else reader.readAsText(file);
     }
 
     function normalizeData(jsonData) {
@@ -309,36 +303,28 @@
         return result;
     }
 
-    // --- 4. 核心分析邏輯 ---
+    // --- 4. 核心邏輯 ---
     function normalizeName(name) {
         if (!name) return "";
-        let s = name.trim();
-        s = s.replace(/（/g, "(").replace(/）/g, ")");
-        s = s.replace(/〈/g, "(").replace(/〉/g, ")");
-        s = s.replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II"); 
-        return s;
+        return name.trim().replace(/（/g, "(").replace(/）/g, ")").replace(/〈/g, "(").replace(/〉/g, ")").replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II");
     }
 
-    function isSameName(studentName, ruleName) {
-        const n1 = normalizeName(studentName);
-        const n2 = normalizeName(ruleName);
-        return n1 === n2; 
-    }
+    function isSameName(sName, rName) { return normalizeName(sName) === normalizeName(rName); }
 
-    function isBasicCourse(name, basicList) {
+    function isBasicCourse(name, list) {
         const n = normalizeName(name);
-        for (let b of basicList) {
-            const nb = normalizeName(b);
-            if (n.includes(nb)) return true;
-        }
-        return false;
+        return list.some(b => n.includes(normalizeName(b)));
     }
 
-    function isGeneralCourse(name) {
-        const prefixes = ["人文", "社會", "自然", "永續", "文明", "領導", "議題"];
-        for (let p of prefixes) {
-            if (name.startsWith(p + "：") || name.startsWith(p + ":") || name.includes(p + "領域")) return true;
-        }
+    function isGeneralEd(name) {
+        const p = ["人文", "社會", "自然", "永續", "文明", "領導", "議題"];
+        return p.some(pre => name.startsWith(pre + "：") || name.startsWith(pre + ":") || name.includes(pre + "領域"));
+    }
+
+    function isDeptElective(name, credit) {
+        const n = normalizeName(name);
+        if (DEPT_ELECTIVE_WHITELIST.some(w => n.includes(normalizeName(w)))) return true;
+        if (credit >= 3 && DEPT_KEYWORDS.some(k => n.includes(k))) return true;
         return false;
     }
 
@@ -347,250 +333,199 @@
 
         const year = document.getElementById('admissionYear').value;
         const rule = RULES[year];
+        const target = CREDITS_TARGET[year];
         
-        let credits = { basic: 0, req: 0, elec: 0, gen: 0, total: 0 };
-        let resultLists = { 
-            basic: [], 
-            req: [], 
-            elec: [], // 其他選修 (系選修正課)
-            elecLab: [], // 系選修實驗
-            gen: [], 
-            fail: [] 
+        let stats = {
+            basic: { cred: 0, count: 0 },
+            req: { cred: 0, count: 0 },
+            deptElec: { cred: 0, count: 0 }, // 含實驗
+            deptElecLab: { cred: 0, count: 0 },
+            genElec: { cred: 0, count: 0 },
+            genEd: { cred: 0, count: 0 },
+            total: 0
         };
 
-        let reqCheckList = rule.required.map(rName => ({ name: rName, matched: false, log: null }));
+        let lists = { basic: [], req: [], deptElec: [], deptElecLab: [], genElec: [], genEd: [], fail: [] };
+        let reqCheckList = rule.required.map(r => ({ name: r, matched: false, log: null }));
 
-        parsedStudentData.forEach(record => {
-            // 及格判斷 (D不及格)
+        parsedStudentData.forEach(rec => {
             const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-'];
-            const isPass = passGrades.includes(record.gpa);
-            let semDigit = record.sem === '上' ? '1' : (record.sem === '下' ? '2' : record.sem);
-
-            if (!isPass) {
-                resultLists.fail.push(record);
+            if (!passGrades.includes(rec.gpa)) {
+                lists.fail.push(rec);
                 return;
             }
 
-            let category = "Unknown";
-            let matchedReq = false;
+            let cat = "Unknown";
+            const normName = normalizeName(rec.name);
 
-            // (A) 管理者例外
-            if (exceptionMap[record.code]) {
-                category = exceptionMap[record.code];
-                if (category === 'Required') {
+            // 1. 例外管理
+            if (exceptionMap[normName]) {
+                cat = exceptionMap[normName];
+                if (cat === 'Required') {
                     for (let r of reqCheckList) {
-                        if (!r.matched && isSameName(record.name, r.name)) {
-                            r.matched = true; r.log = record; break;
-                        }
+                        if (!r.matched && isSameName(rec.name, r.name)) { r.matched = true; r.log = rec; break; }
                     }
                 }
             } 
             else {
-                // (B) 基礎課程
-                if (isBasicCourse(record.name, rule.basic)) {
-                    category = "Basic";
-                }
-                // (C) 系必修 (嚴格比對)
+                // 2. 基礎
+                if (isBasicCourse(rec.name, rule.basic)) cat = "Basic";
+                // 3. 必修
                 else {
+                    let matched = false;
                     for (let r of reqCheckList) {
-                        if (!r.matched && isSameName(record.name, r.name)) {
-                            category = "Required";
-                            r.matched = true;
-                            r.log = record;
-                            matchedReq = true;
-                            break;
+                        if (!r.matched && isSameName(rec.name, r.name)) {
+                            cat = "Required"; r.matched = true; r.log = rec; matched = true; break;
                         }
                     }
-                    
-                    if (!matchedReq) {
-                        // (D) 通識 (前綴判斷)
-                        if (isGeneralCourse(record.name)) {
-                            category = "General";
-                        }
-                        // (E) 系選修
+                    if (!matched) {
+                        // 4. 通識
+                        if (isGeneralEd(rec.name)) cat = "GenEd";
                         else {
-                            // 判斷是否為「其他選修」(原: 一般系選修)
-                            // 優先檢查白名單
-                            let isWhitelisted = false;
-                            for (let w of DEPT_ELECTIVE_WHITELIST) {
-                                if (record.name.includes(w)) {
-                                    isWhitelisted = true;
-                                    break;
-                                }
-                            }
-
-                            if (isWhitelisted) {
-                                category = "Elective";
-                            } else {
-                                // 預設為系選修
-                                category = "Elective"; 
-                            }
+                            // 5. 系選修實驗
+                            const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
+                            const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("實務探索");
+                            if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
+                            // 6. 系選修
+                            else if (isDeptElective(rec.name, rec.credit)) cat = "DeptElective";
+                            // 7. 一般選修
+                            else cat = "GeneralElective";
                         }
                     }
                 }
             }
 
-            // (F) 細分系選修：實驗 vs 其他選修
-            // 修正邏輯：即使是1學分+實作，如果是特定課程(如工程數學實作)，應歸類為"其他選修"而非"實驗"
-            if (category === "Elective" || category === "ElectiveLab") {
-                const isLabKeyword = record.name.includes("實驗") || record.name.includes("實作");
-                
-                // 排除列表：這些課雖然有"實作"且1學分，但使用者定義為"其他選修"
-                const excludeFromLab = record.name.includes("工程數學") || record.name.includes("電路學") || record.name.includes("實務探索");
-
-                if (record.credit === 1 && isLabKeyword && !excludeFromLab) {
-                    category = "ElectiveLab";
-                } else {
-                    category = "Elective"; // 歸類為 其他選修
-                }
-            }
-
-            // 歸檔
-            if (category === "Basic") {
-                resultLists.basic.push(record);
-                credits.basic += record.credit;
-            } else if (category === "Required") {
-                resultLists.req.push(record);
-                credits.req += record.credit;
-            } else if (category === "Elective") {
-                resultLists.elec.push(record);
-                credits.elec += record.credit;
-            } else if (category === "ElectiveLab") {
-                resultLists.elecLab.push(record);
-                credits.elec += record.credit; // 實驗併入系選修總分
-            } else if (category === "General") {
-                resultLists.gen.push(record);
-                credits.gen += record.credit;
-            } else {
-                resultLists.elec.push(record);
-                credits.elec += record.credit;
-            }
-            
-            credits.total += record.credit;
+            // 統計
+            stats.total += rec.credit;
+            if (cat === "Basic") { lists.basic.push(rec); stats.basic.cred += rec.credit; stats.basic.count++; }
+            else if (cat === "Required") { lists.req.push(rec); stats.req.cred += rec.credit; stats.req.count++; }
+            else if (cat === "DeptElective") { lists.deptElec.push(rec); stats.deptElec.cred += rec.credit; stats.deptElec.count++; }
+            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } // 實驗學分算入系選修
+            else if (cat === "GenEd") { lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; }
+            else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
         });
 
-        updateUI(credits, resultLists, reqCheckList);
+        updateDashboard(stats, target, reqCheckList);
+        renderTables(lists, reqCheckList);
     }
 
-    function updateUI(credits, lists, reqCheckList) {
+    // --- 5. 更新儀表板 ---
+    function updateDashboard(stats, target, reqCheckList) {
         document.getElementById('result-section').classList.remove('hidden');
+
+        // 1. 基礎
+        updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
+
+        // 2. 必修 (目標學分從 RULES 抓)
+        document.getElementById('reqTarget').innerText = target.req;
+        updateCard('req', stats.req.cred, target.req, stats.req.count, reqCheckList.length);
+
+        // 3. 系選修 (複雜規則)
+        const eleCred = stats.deptElec.cred;
+        const labCount = stats.deptElecLab.count;
+        const eleTarget = target.deptElec; // 20
+        const isElecPass = eleCred >= eleTarget && labCount >= 1;
         
-        document.getElementById('basicCredits').innerText = credits.basic;
-        document.getElementById('reqCredits').innerText = credits.req;
-        document.getElementById('elecCredits').innerText = credits.elec;
-        document.getElementById('genCredits').innerText = credits.gen;
-        document.getElementById('totalCredits').innerText = credits.total;
+        document.getElementById('deptElecCred').innerText = eleCred;
+        const eleStat = document.getElementById('deptElecStatus');
+        eleStat.className = `dash-status ${isElecPass ? 'status-ok' : 'status-ng'}`;
+        eleStat.innerText = isElecPass ? "達標" : "未達標";
+        
+        const labText = document.getElementById('labStatusText');
+        labText.innerHTML = `實驗課: ${labCount} 門 (需 >= 1) ${labCount >= 1 ? '✅' : '❌'}`;
 
-        const passedCount = reqCheckList.filter(r => r.matched).length;
-        document.getElementById('reqRate').innerText = Math.round((passedCount / reqCheckList.length) * 100) + "%";
+        // 4. 通識
+        updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
 
+        // 5. 總學分
+        const totalStat = document.getElementById('gradStatus');
+        totalStat.className = `dash-status ${stats.total >= target.total ? 'status-ok' : 'status-ng'}`;
+        totalStat.innerText = stats.total >= target.total ? "達標" : "未滿";
+        document.getElementById('totalCred').innerText = stats.total;
+        document.getElementById('genElecCred').innerText = stats.genElec.cred;
+    }
+
+    function updateCard(id, current, target, count, totalCount) {
+        document.getElementById(`${id}Cred`).innerText = current;
+        document.getElementById(`${id}Count`).innerText = count;
+        if(totalCount) document.getElementById(`${id}TotalCount`).innerText = totalCount;
+
+        const statEl = document.getElementById(`${id}Status`);
+        const isPass = current >= target;
+        statEl.className = `dash-status ${isPass ? 'status-ok' : 'status-ng'}`;
+        statEl.innerText = isPass ? "已完成" : "未完成";
+    }
+
+    // --- 6. 渲染表格 ---
+    function renderTables(lists, reqCheckList) {
         const container = document.getElementById('tables-container');
         let html = "";
 
-        // 1. 基礎
-        html += `<h3 class="category-header">1. 基礎課程 (Basic Courses)</h3>`;
-        html += renderSimpleTable(lists.basic);
+        html += `<h3 class="category-header">1. 基礎課程</h3>${renderSimpleTable(lists.basic)}`;
 
-        // 2. 系必修
-        html += `<h3 class="category-header">2. 學系必修科目 (Department Required)</h3>`;
-        html += `<table>
-            <thead><tr><th width="40%">必修科目名稱</th><th width="15%">規定學分</th><th width="15%">狀態</th><th width="30%">修課紀錄 (課名 / 成績)</th></tr></thead>
-            <tbody>`;
+        html += `<h3 class="category-header">2. 系必修科目</h3>`;
+        html += `<table><thead><tr><th width="40%">必修科目名稱</th><th width="15%">狀態</th><th width="45%">修課紀錄</th></tr></thead><tbody>`;
         reqCheckList.forEach(r => {
             const status = r.matched ? '<span class="pass">✔ 通過</span>' : '<span class="fail">✘ 未修</span>';
-            const detail = r.log ? `${r.log.name} (${r.log.gpa})` : "-";
-            html += `<tr>
-                <td style="text-align:left; padding-left:20px;">${r.name}</td>
-                <td>-</td> 
-                <td>${status}</td>
-                <td style="text-align:left;">${detail}</td>
-            </tr>`;
+            const detail = r.log ? `${r.log.name} (${r.log.gpa}, ${r.log.credit}學分)` : "-";
+            html += `<tr><td style="padding-left:20px; font-weight:500;">${r.name}</td><td>${status}</td><td>${detail}</td></tr>`;
         });
         html += `</tbody></table>`;
 
-        // 3. 通識
-        html += `<h3 class="category-header">3. 通識課程 (General Education)</h3>`;
-        html += renderSimpleTable(lists.gen);
+        html += `<h3 class="category-header">3. 通識課程</h3>${renderSimpleTable(lists.genEd)}`;
 
-        // 4. 系選修
-        html += `<h3 class="category-header">4. 系選修 (Department Elective)</h3>`;
-        
-        html += `<div class="sub-category">▶ 系選修實驗 (Laboratory / 1學分)</div>`;
-        html += renderSimpleTable(lists.elecLab);
-        
-        // 名稱調整：一般系選修 -> 其他選修
-        html += `<div class="sub-category">▶ 其他選修 (Other Elective)</div>`;
-        html += renderSimpleTable(lists.elec);
+        html += `<h3 class="category-header">4. 系選修 (含實驗)</h3>`;
+        html += `<div class="sub-category">▶ 系選修實驗 (實驗/實作)</div>${renderSimpleTable(lists.deptElecLab)}`;
+        html += `<br><div class="sub-category">▶ 系選修課程</div>${renderSimpleTable(lists.deptElec)}`;
 
-        // 5. 不及格
+        html += `<h3 class="category-header">5. 一般選修 (外系選修)</h3>${renderSimpleTable(lists.genElec)}`;
+
         if (lists.fail.length > 0) {
-            html += `<h3 class="category-header" style="border-color:#dc3545; color:#dc3545;">❌ 不及格 / 未通過</h3>`;
-            html += renderSimpleTable(lists.fail);
+            html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格</h3>${renderSimpleTable(lists.fail)}`;
         }
 
         container.innerHTML = html;
     }
 
     function renderSimpleTable(list) {
-        if (list.length === 0) return "<p style='color:#999; margin-left:10px;'>無課程資料</p>";
-        let h = `<table><thead><tr>
-            <th width="60%">科目名稱</th>
-            <th width="20%">學分</th>
-            <th width="20%">成績</th>
-        </tr></thead><tbody>`;
-        
-        list.forEach(c => {
-            h += `<tr>
-                <td class="course-name" style="padding-left:20px;">${c.name}</td>
-                <td>${c.credit}</td>
-                <td>${c.gpa}</td>
-            </tr>`;
-        });
+        if (list.length === 0) return "<p style='color:#999; margin-left:15px;'>無資料</p>";
+        let h = `<table><thead><tr><th>科目名稱</th><th>學分</th><th>成績</th></tr></thead><tbody>`;
+        list.forEach(c => h += `<tr><td class="course-name" style="padding-left:20px;">${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`);
         h += `</tbody></table>`;
         return h;
     }
 
-    function reAnalyzeIfReady() {
-        if (parsedStudentData.length > 0) analyze();
-    }
+    function reAnalyzeIfReady() { if (parsedStudentData.length > 0) analyze(); }
 
-    // --- 5. 管理者功能 ---
+    // --- 7. 管理者功能 ---
     function toggleAdmin() {
-        const pwd = prompt("請輸入管理者密碼：");
-        if (pwd === "07160330") {
-            document.getElementById('admin-panel').style.display = 'block';
-        } else {
-            alert("密碼錯誤");
-        }
+        if (prompt("請輸入管理者密碼：") === "07160330") document.getElementById('admin-panel').style.display = 'block';
+        else alert("密碼錯誤");
     }
 
     function addException() {
-        const code = document.getElementById('exCode').value.trim();
+        const name = document.getElementById('exName').value.trim();
         const type = document.getElementById('exType').value;
-        const typeNames = { 
-            "Required": "系必修", "Basic": "基礎課程", 
-            "Elective": "其他選修(系)", "ElectiveLab": "系選修實驗", "General": "通識" 
-        };
+        const labels = { "Required": "系必修", "Basic": "基礎", "DeptElective": "系選修", "DeptElectiveLab": "系選修實驗", "GeneralElective": "一般選修", "GenEd": "通識" };
         
-        if (!code) return alert("請輸入選課代號");
-
-        exceptionMap[code] = type;
+        if (!name) return alert("請輸入課名");
+        const norm = normalizeName(name);
+        exceptionMap[norm] = type;
         
         const list = document.getElementById('exceptionList');
-        if (list.querySelector('li') && list.querySelector('li').innerText === "(尚無規則)") list.innerHTML = "";
+        if (list.querySelector('li')?.innerText === "(無)") list.innerHTML = "";
         
         const li = document.createElement('li');
-        li.innerHTML = `<strong>${code}</strong> ➜ ${typeNames[type]} <button onclick="removeException(this, '${code}')" style="margin-left:10px; color:red; border:none; background:none; cursor:pointer;">[刪除]</button>`;
+        li.innerHTML = `<strong>${name}</strong> ➜ ${labels[type]} <button onclick="removeEx(this, '${norm}')" style="margin-left:10px; color:red; border:none; background:none; cursor:pointer;">[刪除]</button>`;
         list.appendChild(li);
-        document.getElementById('exCode').value = "";
-        
-        if (parsedStudentData.length > 0) analyze();
+        document.getElementById('exName').value = "";
+        reAnalyzeIfReady();
     }
 
-    function removeException(btn, code) {
-        delete exceptionMap[code];
+    function removeEx(btn, key) {
+        delete exceptionMap[key];
         btn.parentElement.remove();
-        if (parsedStudentData.length > 0) analyze();
+        reAnalyzeIfReady();
     }
 </script>
 
