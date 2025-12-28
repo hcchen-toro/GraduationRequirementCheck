@@ -17,17 +17,17 @@
         body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
         
-        /* 標題樣式調整 */
+        /* 標題樣式 */
         h1 { text-align: center; color: var(--primary-color); margin-bottom: 15px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
         
-        /* 修改：學生問候語樣式 (放大、加粗、更顯眼) */
+        /* 學生問候語樣式 (維持大字體) */
         .student-greeting { 
             text-align: center; 
-            font-size: 24px;       /* 字體放大 */
-            font-weight: bold;     /* 加粗 */
-            color: var(--primary-color); /* 使用主題藍色 */
+            font-size: 24px;       
+            font-weight: bold;     
+            color: var(--primary-color); 
             margin-bottom: 30px; 
-            min-height: 35px;      /* 預留空間 */
+            min-height: 35px;      
         }
 
         /* 狀態列 */
@@ -40,6 +40,9 @@
         .input-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #495057; }
         .input-group select, .input-group input[type="file"] { padding: 10px; border: 1px solid #ced4da; border-radius: 5px; width: 100%; box-sizing: border-box; }
         
+        /* 按鈕群組區 (新增 flex wrap) */
+        .btn-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
         /* 門檻勾選區 */
         .checkbox-group { display: flex; gap: 20px; margin-top: 10px; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
         .checkbox-group label { margin-bottom: 0; font-weight: normal; cursor: pointer; display: flex; align-items: center; }
@@ -47,7 +50,12 @@
 
         button.btn { padding: 10px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.2s; }
         button.btn:hover { background-color: #003366; }
-        button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; }
+        
+        /* 新增：下載範例按鈕樣式 (Outline 風格) */
+        button.btn-outline { background-color: #fff; border: 1px solid var(--primary-color); color: var(--primary-color); }
+        button.btn-outline:hover { background-color: #e9ecef; }
+
+        button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; color: white; border: none; border-radius: 5px; cursor: pointer; }
 
         /* 儀表板 */
         .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
@@ -171,9 +179,10 @@
 
         <div class="input-group">
             <label>2. 上傳成績單 & 門檻確認</label>
-            <div style="display: flex; gap: 10px; align-items: center;">
+            <div class="btn-group">
                 <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" />
                 <button class="btn" onclick="processFileAndAnalyze()">開始分析</button>
+                <button class="btn btn-outline" onclick="downloadTemplate()">📥 下載範例檔</button>
             </div>
             
             <div class="checkbox-group">
@@ -184,7 +193,7 @@
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
                 支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
-                <strong>功能：</strong>最下方有缺漏總結；通識含領域指標；化學/物理實驗歸類為外系選修。
+                建議先下載範例檔，將資料貼上後再上傳。
             </div>
         </div>
     </div>
@@ -365,6 +374,20 @@
             const code = c.selection_id || c.course_code;
             if (code) courseDatabase[`${year}-${sem}-${code}`] = c;
         }
+    }
+
+    // --- 新增：下載範例檔功能 ---
+    function downloadTemplate() {
+        // 加入 BOM (\uFEFF) 讓 Excel 能正確識別 UTF-8 中文
+        const csvContent = "\uFEFF學年度,學期,選課代號,科目名稱,學分,GPA\n112,上,1234,範例課程請刪除,3,A";
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", "成績單範例.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     // --- 3. 檔案讀取 ---
