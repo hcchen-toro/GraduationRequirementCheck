@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (v15.0 穩定版)</title>
+    <title>東海電機畢業學分審查系統 (v16.0 學年課修正版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { 
@@ -97,7 +97,7 @@
 <body>
 
 <div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v15.0 穩定版)</span></h1>
+    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.5em; color:#666;">(v16.0 學年課修正版)</span></h1>
 
     <div class="status-bar">
         <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
@@ -132,7 +132,7 @@
             </div>
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援格式：.xlsx, .xls, .csv。系統將自動過濾重複修課紀錄，取最高分計算。
+                支援格式：.xlsx, .xls, .csv。已修復學年課(如體育/物理)被誤刪的問題。
             </div>
         </div>
     </div>
@@ -324,7 +324,7 @@
         }
     }
 
-    // --- 3. 檔案讀取 (修復核心：通用 SheetJS 讀取 + 安全 DOM 操作) ---
+    // --- 3. 檔案讀取 (相容 XLSX/CSV) ---
     function processFileAndAnalyze() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
@@ -335,17 +335,16 @@
         reader.onload = function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
-                // 強制使用 SheetJS 讀取所有格式 (包含 CSV)，解決編碼問題
+                // 強制使用 SheetJS 讀取
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 if (!sheetName) throw new Error("Excel/CSV 檔案中找不到工作表");
                 
-                // 讀取並轉換為 JSON
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
                 
                 parsedStudentData = normalizeData(jsonData);
                 
-                // 資料前處理：去重複 (取最高分)
+                // 去重複邏輯 (修正：使用 課名+學期 為 Key，保留學年課)
                 parsedStudentData = deduplicateData(parsedStudentData);
                 
                 analyze();
@@ -355,18 +354,15 @@
             }
         };
 
-        // 統一使用 ArrayBuffer 讀取
         reader.readAsArrayBuffer(file); 
     }
 
     function normalizeData(jsonData) {
         return jsonData.map(rawRow => {
-            // 清理欄位名稱 (去除空白)
             const row = {};
             for (let k in rawRow) {
                 row[k.trim()] = rawRow[k];
             }
-
             return {
                 year: String(row['學年度'] || row['year'] || "").trim(),
                 sem: String(row['學期'] || row['semester'] || "").trim(),
@@ -375,29 +371,30 @@
                 credit: parseFloat(row['學分'] || row['credits'] || 0),
                 gpa: String(row['GPA'] || row['gpa'] || "").trim()
             };
-        }).filter(item => item.name); // 過濾掉空行
+        }).filter(item => item.name);
     }
 
-    // --- 3.1 去重複邏輯 ---
+    // --- 3.1 去重複邏輯 (修正重點) ---
     function deduplicateData(data) {
         const map = new Map();
 
         data.forEach(item => {
             const normName = normalizeName(item.name);
-            const key = normName; 
+            // 修正：Key 包含學期，這樣同名但不同學期的課(如體育/普通物理上下)會被視為不同課程保留
+            const key = normName + "_" + item.sem; 
             
             const itemPoint = getGradePoint(item.gpa);
             
             if (map.has(key)) {
                 const exist = map.get(key);
                 const existPoint = getGradePoint(exist.gpa);
-                // 保留成績較高的，若相同保留較新的
+                // 只有在「同課名」且「同學期」的情況下(重修)，才取最高分
                 if (itemPoint > existPoint) {
                     map.set(key, item);
                 } else if (itemPoint === existPoint) {
-                    const itemSemVal = parseInt(item.year)*10 + (item.sem==='上'?1:2);
-                    const existSemVal = parseInt(exist.year)*10 + (exist.sem==='上'?1:2);
-                    if (itemSemVal > existSemVal) map.set(key, item);
+                    const itemYear = parseInt(item.year);
+                    const existYear = parseInt(exist.year);
+                    if (itemYear > existYear) map.set(key, item);
                 }
             } else {
                 map.set(key, item);
@@ -503,6 +500,9 @@
                     let matched = false;
                     for (let r of reqCheckList) {
                         if (!r.matched && isSameName(rec.name, r.name)) {
+                            // 這裡只有當 r.matched 為 false 時才標記
+                            // 所以即使資料中有兩個「普通物理」(一上、一下)，因為 reqCheckList 只有一個「普通物理」
+                            // 所以第二個會流向「系選修」或「一般選修」，避免必修學分重複計算
                             cat = "Required"; r.matched = true; r.log = rec; matched = true; break;
                         }
                     }
@@ -543,14 +543,12 @@
         renderTables(lists, reqCheckList);
     }
 
-    // --- 5. 更新儀表板 (已修復 Crash 問題) ---
+    // --- 5. 更新儀表板 (已加入 null check) ---
     function updateDashboard(stats, target, reqCheckList, gpa, gpaCount) {
         document.getElementById('result-section').classList.remove('hidden');
 
-        // 更新各個卡片 (加入 null check 防止崩潰)
         updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
         
-        // 基礎詳細
         const d = stats.basic.details;
         const basicText = `
             中文: ${d.chi}/2 ${d.chi>=2?'✔':'❌'} | 英文: ${d.eng}/4 ${d.eng>=4?'✔':'❌'}<br>
@@ -577,7 +575,6 @@
 
         updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
 
-        // GPA 更新
         document.getElementById('gpaValue').innerText = gpa;
         document.getElementById('gpaCount').innerText = gpaCount;
 
@@ -601,9 +598,8 @@
         document.getElementById('genElecCred').innerText = stats.genElec.cred;
     }
 
-    // 安全更新卡片的函數 (修正重點)
     function updateCard(id, current, target, count, totalCount) {
-        // 1. 安全檢查元素是否存在，避免 null error
+        // 安全檢查，防止 DOM 不存在時報錯
         const credEl = document.getElementById(`${id}Cred`);
         if (credEl) credEl.innerText = current;
 
@@ -672,7 +668,6 @@
 
     function renderSimpleTable(list) {
         if (list.length === 0) return "<p style='color:#999; margin-left:15px;'>無資料</p>";
-        // 按照學年學期排序
         list.sort((a,b) => (a.year - b.year) || (a.sem - b.sem));
         let h = `<table><thead><tr><th width="15%">學期</th><th width="55%">科目名稱</th><th width="15%">學分</th><th width="15%">成績</th></tr></thead><tbody>`;
         list.forEach(c => h += `<tr><td>${c.year}-${c.sem}</td><td class="course-name" style="padding-left:20px;">${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`);
