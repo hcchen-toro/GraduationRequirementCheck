@@ -22,7 +22,7 @@
         /* 學生問候語加大 */
         .student-greeting { 
             text-align: center; 
-            font-size: 32px;       /* 加大字體 */
+            font-size: 32px;       
             font-weight: bold;     
             color: var(--primary-color); 
             margin-bottom: 30px; 
@@ -180,7 +180,7 @@
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
                 支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
-                <strong>功能更新：</strong>通識領域採直覺判定，只要課名含人文/社會/自然即認可，修復大氣科學、科學探索等誤判。
+                <strong>功能更新：</strong>通識領域採「嚴格開頭」判定，杜絕「電機工程實務探索」誤判為自然通識。
             </div>
         </div>
     </div>
@@ -318,13 +318,6 @@
 
     const GRADE_POINTS = { "A+": 4.3, "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7, "C+": 2.3, "C": 2.0, "C-": 1.7, "D": 1.0, "E": 0, "F": 0, "X": 0 };
 
-    // 關鍵修正：補上「科學」、「大氣」、「探索」、「文化」等詞
-    const GEN_ED_KEYWORDS = {
-        hu: ["人文", "文明", "歷史", "哲學", "藝術", "信仰", "文學", "思考", "文創", "文化"],
-        so: ["社會", "公民", "經濟", "政治", "心理", "管理", "法", "領導", "全球", "國際"],
-        na: ["自然", "科技", "環境", "醫學", "生物", "化學", "物理", "生態", "永續", "運算", "邏輯", "科普", "生命", "科學", "大氣", "探索"]
-    };
-
     let parsedStudentData = [];
     let exceptionMap = {}; 
     let courseDatabase = {}; 
@@ -442,6 +435,7 @@
 
     function getGradePoint(grade) { return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1; }
 
+    // 核心修正：標準化名稱 (去除空白與全形冒號)
     function normalizeName(name) {
         if (!name) return "";
         return name.trim().replace(/\s+/g, "").replace(/（/g, "(").replace(/）/g, ")").replace(/〈/g, "(").replace(/〉/g, ")").replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II").replace(/：/g, ":");
@@ -450,16 +444,14 @@
     function isSameName(sName, rName) { return normalizeName(sName) === normalizeName(rName); }
     function isBasicCourse(name, list) { return list.some(b => normalizeName(name).includes(normalizeName(b))); }
     
+    // 嚴格通識判定：只看「開頭」是否符合
     function isGeneralEd(name) {
-        // 直覺判斷優先：只要名稱含有人文/社會/自然，就是通識 (包含前綴或內容)
-        const normName = normalizeName(name);
-        if (normName.includes("人文") || normName.includes("社會") || normName.includes("自然")) return true;
-
-        // 輔助判斷：前綴與關鍵字
-        const p = ["永續", "文明", "領導", "議題"];
-        if (p.some(pre => normName.startsWith(pre + ":") || normName.includes(pre + "領域") || normName.startsWith(pre))) return true;
-        
-        return Object.values(GEN_ED_KEYWORDS).flat().some(k => normName.includes(k));
+        const n = normalizeName(name); // 已處理冒號
+        const strictPrefixes = [
+            "人文", "社會", "自然", 
+            "文明與經典", "領導與倫理", "議題導向", "永續實踐"
+        ];
+        return strictPrefixes.some(pre => n.startsWith(pre));
     }
 
     function isForceGenElective(name) { return FORCE_GEN_ELEC_LIST.some(f => normalizeName(name).includes(normalizeName(f))); }
@@ -543,16 +535,14 @@
             else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } 
             else if (cat === "GenEd") { 
                 lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; 
-                
-                // 修正：直覺優先判定，只要名稱有該字串就算，不依賴關鍵字庫
-                if (normName.includes("人文")) stats.genEd.domains.hu = true;
-                if (normName.includes("社會")) stats.genEd.domains.so = true;
-                if (normName.includes("自然")) stats.genEd.domains.na = true;
-
-                // 補強判定：若無該字串，才查關鍵字庫
-                if (!stats.genEd.domains.hu && GEN_ED_KEYWORDS.hu.some(k => normName.includes(k))) stats.genEd.domains.hu = true;
-                if (!stats.genEd.domains.so && GEN_ED_KEYWORDS.so.some(k => normName.includes(k))) stats.genEd.domains.so = true;
-                if (!stats.genEd.domains.na && GEN_ED_KEYWORDS.na.some(k => normName.includes(k))) stats.genEd.domains.na = true;
+                // 嚴格前綴判定領域 (不再亂搜關鍵字)
+                if (normName.startsWith("人文")) stats.genEd.domains.hu = true;
+                if (normName.startsWith("社會")) stats.genEd.domains.so = true;
+                if (normName.startsWith("自然")) stats.genEd.domains.na = true;
+                // 文明與經典歸人文，領導與倫理歸社會 (依慣例，若有誤可調整)
+                if (normName.startsWith("文明與經典")) stats.genEd.domains.hu = true;
+                if (normName.startsWith("領導與倫理")) stats.genEd.domains.so = true;
+                // 議題導向與永續通常有對應領域，但若無標示則只算學分，不亮特定燈號
             }
             else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
         });
