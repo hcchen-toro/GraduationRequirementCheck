@@ -3,705 +3,2476 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>東海電機畢業學分審查系統 (by HC)</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <title>東海電機排課模擬器 by HC</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.4.4/lz-string.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
     <style>
-        :root { 
-            --primary-color: #004b97; 
-            --secondary-color: #f8f9fa; 
-            --success-color: #198754; 
-            --danger-color: #dc3545; 
-            --warning-color: #ffc107; 
-            --info-color: #0dcaf0; 
-        }
-        body { font-family: "Microsoft JhengHei", "Segoe UI", sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 1280px; margin: 0 auto; background: #fff; padding: 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-radius: 12px; }
-        
-        h1 { text-align: center; color: var(--primary-color); margin-bottom: 15px; border-bottom: 3px solid var(--primary-color); padding-bottom: 15px; }
-        
-        /* 學生問候語加大 */
-        .student-greeting { 
-            text-align: center; 
-            font-size: 32px;       
-            font-weight: bold;     
-            color: var(--primary-color); 
-            margin-bottom: 30px; 
-            min-height: 45px;      
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+        :root {
+            --color-bg: #e0e0e0;
+            --border-color: #dadce0;
+            --sidebar-width: 220px; 
         }
 
-        .status-bar { background: #e9ecef; padding: 10px 20px; border-radius: 8px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-        .status-ready { color: var(--success-color); font-weight: bold; }
-        .status-loading { color: #0d6efd; font-weight: bold; }
-
-        .control-panel { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; background: var(--secondary-color); padding: 25px; border-radius: 10px; margin-bottom: 30px; border: 1px solid #dee2e6; }
-        .input-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #495057; }
-        .input-group select, .input-group input[type="file"] { padding: 10px; border: 1px solid #ced4da; border-radius: 5px; width: 100%; box-sizing: border-box; }
+        * { box-sizing: border-box; }
         
-        .btn-group { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-        .checkbox-group { display: flex; gap: 20px; margin-top: 10px; background: #fff; padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
-        .checkbox-group label { margin-bottom: 0; font-weight: normal; cursor: pointer; display: flex; align-items: center; }
-        .checkbox-group input { margin-right: 8px; width: 18px; height: 18px; }
-
-        button.btn { padding: 10px 24px; background-color: var(--primary-color); color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; transition: 0.2s; }
-        button.btn:hover { background-color: #003366; }
-        
-        button.btn-outline { background-color: #fff; border: 1px solid var(--primary-color); color: var(--primary-color); }
-        button.btn-outline:hover { background-color: #e9ecef; }
-
-        button.btn-admin { background-color: #6c757d; font-size: 13px; padding: 6px 12px; color: white; border: none; border-radius: 5px; cursor: pointer; }
-
-        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .dash-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: transform 0.2s; cursor: pointer; }
-        .dash-card:hover { transform: translateY(-3px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); border-color: var(--primary-color); }
-        .dash-title { font-size: 16px; font-weight: bold; color: #555; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-        .dash-value { font-size: 28px; font-weight: bold; color: var(--primary-color); }
-        .dash-sub { font-size: 13px; color: #777; margin-top: 5px; line-height: 1.5; }
-        .dash-status { font-size: 12px; padding: 2px 8px; border-radius: 10px; color: #fff; font-weight: bold; }
-        .status-ok { background-color: var(--success-color); }
-        .status-ng { background-color: var(--danger-color); }
-        .status-warn { background-color: var(--warning-color); color: #333; }
-        .status-info { background-color: var(--info-color); color: #fff; }
-
-        .ge-indicators { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-        .ge-tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; border: 1px solid #ccc; background: #eee; color: #999; }
-        .ge-tag.active { background: #d1e7dd; border-color: #badbcc; color: #0f5132; font-weight: bold; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 15px; border-radius: 8px; overflow: hidden; }
-        th, td { border: 1px solid #dee2e6; padding: 12px 15px; text-align: left; }
-        th { background-color: var(--primary-color); color: white; text-align: center; }
-        td { text-align: center; }
-        tr:nth-child(even) { background-color: #f8f9fa; }
-        
-        .pass { color: var(--success-color); font-weight: bold; }
-        .fail { color: var(--danger-color); font-weight: bold; }
-        .course-name { text-align: left; font-weight: 500; }
-
-        .category-header { margin-top: 50px; border-left: 5px solid var(--primary-color); padding-left: 15px; color: #333; font-size: 1.4em; }
-        .sub-category { margin-top: 20px; color: #555; font-size: 1.1em; font-weight: bold; margin-bottom: 10px; background: #e9ecef; padding: 8px 12px; border-radius: 6px; display: inline-block; }
-
-        .back-to-top {
-            text-align: right;
-            margin-top: 10px;
-            font-size: 14px;
-            color: var(--primary-color);
-            cursor: pointer;
-            display: inline-block;
-            width: 100%;
-        }
-        .back-to-top:hover { text-decoration: underline; }
-
-        #missing-summary-panel {
-            margin-top: 50px;
-            background-color: #fff5f5;
-            border: 2px solid #ffcccc;
-            border-radius: 10px;
-            padding: 25px;
-        }
-        #missing-summary-panel h3 {
-            color: #d63384;
-            margin-top: 0;
-            border-bottom: 2px solid #ffcccc;
-            padding-bottom: 10px;
-        }
-        .missing-item {
-            color: #c0392b;
-            margin-bottom: 8px;
-            font-size: 15px;
+        body {
+            background-color: var(--color-bg);
+            font-family: 'Noto Sans TC', sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; 
+            color: #333;
             display: flex;
-            align-items: flex-start;
+            justify-content: center;
+            align-items: center;
         }
-        .missing-item::before {
-            content: "⚠️";
-            margin-right: 10px;
+
+        /* SweetAlert2 Z-Index Fix */
+        .swal2-container {
+            z-index: 10000 !important;
         }
-        .congrats-msg {
-            color: var(--success-color);
+
+        /* Read Only Mode Styles */
+        body.read-only-mode .edit-only {
+            display: none !important;
+        }
+        body.read-only-mode .course-card {
+            cursor: default !important;
+        }
+        body.read-only-mode .course-block {
+            cursor: default !important;
+        }
+        body.read-only-mode .split-part {
+            cursor: default !important;
+        }
+
+        .app-container {
+            display: flex;
+            width: auto; 
+            max-width: 96vw; 
+            height: 90vh;
+            padding: 0;
+            gap: 10px;
+            transition: width 0.3s ease-in-out;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            flex-shrink: 0; 
+            z-index: 30;
+            height: 100%; 
+        }
+
+        .courses-list-wrapper {
+            flex: 1;
+            overflow-y: auto; 
+            margin-top: 10px;
+            padding-right: 5px;
+        }
+
+        .teacher-group {
+            margin-bottom: 8px;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            overflow: hidden;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+        .teacher-header {
+            background-color: #f9f9f9;
+            padding: 8px 10px;
+            font-size: 13px;
             font-weight: bold;
-            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+            transition: background 0.2s;
+            border-left-width: 5px; 
+            border-left-style: solid;
+        }
+        .teacher-header:hover { background-color: #eaeaea; }
+        .teacher-content { display: block; padding: 5px; background: #fff; }
+        .teacher-content.is-collapsed { display: none; }
+        
+        .course-card {
+            background: white;
+            border: 1px solid #eee;
+            border-left-width: 4px;
+            border-radius: 4px;
+            padding: 6px 8px;
+            margin-bottom: 6px;
+            cursor: default; 
+            transition: all 0.2s;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            user-select: none;
+            position: relative;
+        }
+        .course-card.draggable-card { cursor: grab; } 
+        
+        .course-card.is-fully-scheduled {
+            opacity: 0.5;
+            filter: grayscale(100%);
+            background-color: #f5f5f5;
+        }
+
+        .course-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .course-card.disabled { opacity: 0.5; background: #f9f9f9; cursor: not-allowed; transform: none; }
+        .course-card.is-fully-scheduled:hover { transform: none; box-shadow: none; } 
+        
+        .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2px; }
+        .card-title { font-weight: 700; font-size: 13px; color: #2c3e50; }
+        .tag-split { background: #ffeaa7; color: #d35400; font-size: 10px; padding: 1px 4px; border-radius: 3px; font-weight: bold; }
+        
+        /* 學期標籤樣式 */
+        .sem-tag {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            font-size: 9px;
+            padding: 1px 3px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+        }
+        .sem-1 { background-color: #3498db; } /* 上 */
+        .sem-2 { background-color: #e67e22; } /* 下 */
+        .sem-3 { background-color: #9b59b6; } /* 全 */
+
+        .btn-actions { display: flex; gap: 4px; margin-top: 4px; }
+        .btn-actions button { flex: 1; border: none; padding: 2px; border-radius: 3px; font-size: 10px; cursor: pointer; color: white; transition: opacity 0.2s; }
+
+        .split-parts-container {
+            display: flex;
+            gap: 4px;
+            margin: 4px 0;
+        }
+        .split-part {
+            flex: 1;
+            background-color: #f0f8ff;
+            border: 1px dashed #4a90e2;
+            color: #2c3e50;
+            font-size: 11px;
+            padding: 3px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: grab;
+            transition: background 0.2s;
+            user-select: none;
+        }
+        .split-part:hover { background-color: #e1f0ff; }
+        .split-part.disabled { 
+            opacity: 0.5; 
+            cursor: not-allowed; 
+            background-color: #eee;
+            border-color: #ccc;
+        }
+
+        .main-content {
+            flex: 1;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            overflow: hidden; 
+            position: relative;
+        }
+
+        .top-bar { width: 100%; margin-bottom: 5px; flex-shrink: 0; }
+
+        .timetable-container {
+            width: 100%;
+            height: 100%;
+            padding: 5px;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .timetable {
+            border-collapse: separate;
+            border-spacing: 0;
+            table-layout: fixed; 
+            width: 100%;
+            height: 100%; 
+        }
+
+        .timetable th {
+            background: #fafafa;
+            z-index: 10;
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            padding: 0;
+            text-align: center !important; 
+            vertical-align: middle !important; 
+            font-size: 12px;
+            color: #555;
+            height: 28px;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .timetable td {
+            border-right: 1px solid var(--border-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 0;
+            vertical-align: top;
+            position: relative;
+            background: white;
+        }
+
+        .day-border-left {
+            border-left: 2px solid #888 !important;
+        }
+
+        .grade-highlight {
+            background-color: rgba(255, 235, 59, 0.25) !important; 
+            box-shadow: inset 0 0 0 1px #FBC02D;
+        }
+        .suggestion-highlight {
+            background-color: rgba(100, 221, 23, 0.4) !important;
+            box-shadow: inset 0 0 0 2px #4CAF50;
+            z-index: 5;
+        }
+        .grade-highlight.suggestion-highlight {
+            background-color: rgba(100, 221, 23, 0.4) !important;
+        }
+
+        .time-col {
+            width: 30px !important; 
+            background: #fafafa;
+            border-right: 2px solid #ddd !important;
+            text-align: center !important;
+            vertical-align: middle !important;
+            font-weight: bold;
+            color: #555;
+            font-size: 10px;
+        }
+
+        .weekend-bg { background-color: #fcfcfc !important; }
+
+        .course-block {
+            position: absolute;
+            z-index: 20; 
+            border-radius: 2px;
+            padding: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-size: 16px; 
+            font-weight: 700;
+            line-height: 1.3;
+            color: #222; 
+            overflow: hidden;
+            cursor: grab; 
+            box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+            transition: transform 0.1s, z-index 0.1s;
+            border: 1px solid rgba(0,0,0,0.1);
+            white-space: normal;
+            word-break: break-all;
+            user-select: none;
+        }
+        
+        .course-block:hover { z-index: 100 !important; transform: scale(1.05); box-shadow: 0 4px 10px rgba(0,0,0,0.25); }
+        .course-info { font-size: 0.8em; opacity: 0.9; font-weight: normal; margin-top: 0px; display: block; }
+        
+        body.is-dragging .course-block { pointer-events: none; opacity: 0.6; }
+        body.is-dragging .timetable td { cursor: copy; }
+
+        .course-block .del-btn {
+            position: absolute; top: 0; right: 0; width: 14px; height: 14px;
+            background: rgba(255, 255, 255, 0.9); text-align: center; line-height: 14px;
+            font-size: 10px; cursor: pointer; display: none; color: #c0392b; font-weight: bold;
+            z-index: 101; pointer-events: auto; border-bottom-left-radius: 3px;
+        }
+        .course-block:hover .del-btn { display: block; }
+        
+        .course-block.is-locked .del-btn { display: none !important; }
+        .course-block.is-locked { cursor: not-allowed; border: 2px solid #ff0000; }
+
+        .drop-highlight { background-color: rgba(50, 168, 159, 0.15) !important; box-shadow: inset 0 0 0 2px #32a89f; }
+        .settings-box { background: #f8f9fa; border-radius: 6px; padding: 8px; margin-bottom: 10px; display: none; border: 1px solid #eee; font-size: 0.9em; }
+        
+        .modal-card { width: 350px; }
+        
+        .legend-item { cursor: pointer; transition: transform 0.1s; }
+        .legend-item:hover { transform: scale(1.1); font-weight: bold; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        
+        .avail-table { width: 100%; font-size: 10px; text-align: center; }
+        .avail-table td, .avail-table th { padding: 2px; border: 1px solid #eee; }
+        .avail-checkbox { transform: scale(1.2); cursor: pointer; }
+
+        .user-status { font-size: 0.8rem; display: flex; align-items: center; margin-right: 10px; }
+        .user-avatar { width: 24px; height: 24px; border-radius: 50%; margin-right: 5px; background: #ddd; }
+        .auth-buttons { display: flex; gap: 5px; }
+        #firebaseUserDisplay { display: none; align-items: center; background: #f0f0f0; padding: 2px 8px; border-radius: 12px; }
+
+        /* Mode Selection Modal Custom Styles */
+        .mode-selection-content {
             text-align: center;
         }
-
-        #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
-        .hidden { display: none; }
-
-        @media print {
-            .control-panel, .status-bar, .back-to-top, .btn, #admin-panel { display: none !important; }
-            .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
-            body { background: white; -webkit-print-color-adjust: exact; }
-            .dash-card { border: 1px solid #999; break-inside: avoid; }
-            h1 { font-size: 24px; margin-bottom: 10px; }
-            .student-greeting { display: block !important; margin-bottom: 20px; font-weight: bold; color: #000; font-size: 20px; }
-            .category-header { margin-top: 30px; page-break-after: avoid; }
-            table { page-break-inside: auto; }
-            tr { page-break-inside: avoid; page-break-after: auto; }
-            #missing-summary-panel { border: 2px solid #333; }
+        .mode-card {
+            padding: 2rem;
+            border-radius: 12px;
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s;
+            cursor: pointer;
+            border: 2px solid transparent;
+            height: 100%;
         }
+        .mode-card:hover {
+            transform: translateY(-5px);
+            border-color: #3298dc;
+        }
+        .mode-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #3298dc;
+        }
+        
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>東海電機 畢業學分審查系統 <span style="font-size:0.6em; color:#666;">(by HC)</span></h1>
-    <div id="greetingDisplay" class="student-greeting"></div>
-
-    <div class="status-bar">
-        <span id="dbStatus" class="status-loading">⏳ 正在初始化資料庫...</span>
-        <div>
-            <button class="btn btn-admin" onclick="window.print()">🖨️ 列印報告</button>
-            <button class="btn btn-admin" onclick="toggleAdmin()">🔧 管理者模式</button>
-        </div>
-    </div>
-
-    <div class="control-panel">
-        <div class="input-group">
-            <label>1. 選擇入學年度</label>
-            <select id="admissionYear" onchange="reAnalyzeIfReady()">
-                <option value="111">111 學年度</option>
-                <option value="112">112 學年度</option>
-                <option value="113">113 學年度</option>
-                <option value="114">114 學年度</option>
-            </select>
-        </div>
-
-        <div class="input-group">
-            <label>2. 上傳成績單 & 門檻確認</label>
-            <div class="btn-group">
-                <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" />
-                <button class="btn" onclick="processFileAndAnalyze()">開始分析</button>
-                <button class="btn btn-outline" onclick="downloadTemplate()">📥 下載範例檔 (.xlsx)</button>
-            </div>
+<div class="modal is-active" id="modeSelectionModal" style="z-index: 9999;">
+    <div class="modal-background" style="background-color: rgba(0,0,0,0.9);"></div>
+    <div class="modal-content" style="width: 600px; max-width: 90vw;">
+        <div class="box mode-selection-content">
+            <h1 class="title is-4 mb-5">歡迎使用 東海電機排課模擬器</h1>
+            <p class="subtitle is-6 mb-5">請選擇使用模式</p>
             
-            <div class="checkbox-group">
-                <span style="font-weight:bold; color:#495057;">畢業門檻確認：</span>
-                <label><input type="checkbox" id="chkPE" onchange="reAnalyzeIfReady()"> 體育門檻已完成</label>
-                <label><input type="checkbox" id="chkLabor" onchange="reAnalyzeIfReady()"> 勞作教育已完成</label>
-            </div>
-
-            <div style="font-size: 12px; color: #666; margin-top: 8px;">
-                支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
-                <strong>功能更新：</strong>通識領域採「嚴格開頭」判定，杜絕「電機工程實務探索」誤判為自然通識。
-            </div>
-        </div>
-    </div>
-
-    <div id="result-section" class="hidden">
-        
-        <div id="dashboard-anchor"></div>
-        <h3 style="color:#555; margin-bottom:15px;">📊 學分審核儀表板</h3>
-        <p style="font-size:13px; color:#777; margin-top:-10px;">(點擊下方卡片可快速跳轉至詳細表格)</p>
-
-        <div class="dashboard-grid">
-            <div class="dash-card" onclick="scrollToId('tbl-basic')">
-                <div class="dash-title">基礎學分 <span id="basicStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-value"><span id="basicCred">0</span> <span style="font-size:16px; color:#999;">/ 14</span></div>
-                <div class="dash-sub" id="basicDetailText" style="font-size:12px;">
-                    中文: 0/2 | 英文: 0/4<br>
-                    軍訓: 0/1 | 體育: 0/4
+            <div class="columns">
+                <div class="column">
+                    <div class="mode-card" onclick="selectReadOnlyMode()">
+                        <div class="mode-icon"><i class="fas fa-eye"></i></div>
+                        <h3 class="title is-5">唯讀模式</h3>
+                        <p class="is-size-7 has-text-grey">僅供檢視，無法編輯。<br>可登入以讀取雲端存檔。</p>
+                    </div>
+                </div>
+                <div class="column">
+                    <div class="mode-card" onclick="selectEditMode()">
+                        <div class="mode-icon"><i class="fas fa-edit"></i></div>
+                        <h3 class="title is-5">編輯模式</h3>
+                        <p class="is-size-7 has-text-grey">完整功能，可編輯、雲端存檔。<br><strong>需要輸入密碼。</strong></p>
+                    </div>
                 </div>
             </div>
-
-            <div class="dash-card" onclick="scrollToId('tbl-req')">
-                <div class="dash-title">系必修 <span id="reqStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-value"><span id="reqCred">0</span> <span style="font-size:16px; color:#999;">/ <span id="reqTarget">58</span></span></div>
-                <div class="dash-sub">已修門數: <span id="reqCount">0</span> / <span id="reqTotalCount">0</span></div>
-            </div>
-
-            <div class="dash-card" style="border-left: 5px solid #ffc107;" onclick="scrollToId('tbl-deptElec')">
-                <div class="dash-title">系選修 (含實驗) <span id="deptElecStatus" class="dash-status status-ng">未達標</span></div>
-                <div class="dash-value"><span id="deptElecCred">0</span> <span style="font-size:16px; color:#999;">/ 20</span></div>
-                <div class="dash-sub" id="labStatusText">實驗課: 0 門 (需 >= 1) ❌</div>
-            </div>
-
-            <div class="dash-card" onclick="scrollToId('tbl-genEd')">
-                <div class="dash-title">通識學分 <span id="genEdStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-value"><span id="genEdCred">0</span> <span style="font-size:16px; color:#999;">/ 12</span></div>
-                <div class="ge-indicators">
-                    <span id="geTagHu" class="ge-tag">人文</span>
-                    <span id="geTagSo" class="ge-tag">社會</span>
-                    <span id="geTagNa" class="ge-tag">自然</span>
-                </div>
-            </div>
-
-            <div class="dash-card" style="background:#e3f2fd; border-color: #90caf9;">
-                <div class="dash-title">平均績點 (GPA) <span class="dash-status status-info">參考</span></div>
-                <div class="dash-value" id="gpaValue">0.00</div>
-                <div class="dash-sub" style="font-size:12px; color:#555;">
-                    採計課程數: <span id="gpaCount">0</span> 門<br>
-                    (僅計算有分數之課程)
-                </div>
-            </div>
-
-            <div class="dash-card" style="background:#f8f9fa;" onclick="scrollToId('tbl-genElec')">
-                <div class="dash-title">畢業總學分 <span id="gradStatus" class="dash-status status-ng">未滿</span></div>
-                <div class="dash-value"><span id="totalCred">0</span> <span style="font-size:16px; color:#999;">/ 128</span></div>
-                <div class="dash-sub">一般選修: <span id="genElecCred">0</span> 學分</div>
-            </div>
-            
-            <div class="dash-card" style="background:#f0f8ff;">
-                <div class="dash-title">畢業門檻 <span id="thresholdStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-sub" style="font-size: 14px; margin-top: 10px;">
-                    <div id="peStatusText">體育門檻：❌</div>
-                    <div id="laborStatusText" style="margin-top:5px;">勞作教育：❌</div>
-                </div>
-            </div>
-        </div>
-
-        <div id="tables-container"></div>
-        
-        <div id="missing-summary-panel">
-            <h3>📝 溫馨提醒：目前缺少項目總結</h3>
-            <div id="missing-content"></div>
-        </div>
-    </div>
-
-    <div id="admin-panel">
-        <h3 style="color:#856404;">🔧 例外管理 (以課名判定)</h3>
-        <p>輸入課程名稱，強制指定其類別：</p>
-        
-        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="exName" placeholder="課程名稱 (如: 數位影像處理)" style="padding: 8px; width: 250px;">
-            <select id="exType" style="padding: 8px;">
-                <option value="Required">強制設為：系必修</option>
-                <option value="Basic">強制設為：基礎課程</option>
-                <option value="DeptElective">強制設為：系選修</option>
-                <option value="DeptElectiveLab">強制設為：系選修實驗</option>
-                <option value="GeneralElective">強制設為：一般選修</option>
-                <option value="GenEd">強制設為：通識</option>
-            </select>
-            <button class="btn" onclick="addException()">新增規則</button>
-        </div>
-
-        <div style="margin-top: 15px;">
-            <strong>目前規則：</strong>
-            <ul id="exceptionList" style="margin-top: 5px;">
-                <li style="color:#666;">(無)</li>
-            </ul>
         </div>
     </div>
 </div>
 
+<div class="app-container" id="appContainer">
+    <div class="sidebar" id="sidebar">
+        <div class="level is-mobile mb-3">
+            <div class="level-left">
+                <h2 class="title is-6 mb-0" style="font-size: 1rem;">📚 課程管理</h2>
+                <div class="dropdown is-hoverable ml-2 edit-only">
+                    <div class="dropdown-trigger">
+                        <button class="button is-small is-ghost px-1" aria-haspopup="true" aria-controls="dropdown-menu">
+                            <span class="icon is-small"><i class="fas fa-ellipsis-v"></i></span>
+                        </button>
+                    </div>
+                    <div class="dropdown-menu" id="dropdown-menu" role="menu">
+                        <div class="dropdown-content">
+                            <a href="#" class="dropdown-item" onclick="toggleDeptReqs()">
+                                ⚡ 切換: 電機系校必修
+                            </a>
+                            <hr class="dropdown-divider">
+                            <a href="#" class="dropdown-item has-text-danger" onclick="clearScheduleOnly()">
+                                🗑️ 清除課表 (保留列表)
+                            </a>
+                            <a href="#" class="dropdown-item has-text-danger" onclick="clearAllData()">
+                                🧨 清除所有資料
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="level-right"><button class="button is-primary is-small is-rounded edit-only" style="font-size: 0.75rem;" onclick="openModal()">+ 新增</button></div>
+        </div>
+
+        <button class="button is-small is-fullwidth mb-2" style="font-size: 0.75rem;" onclick="toggleSettings()">⚙️ 設定 (學年/學期)</button>
+        
+        <div id="settingsPanel" class="settings-box">
+            <div class="field mb-3">
+                <label class="label is-small">📅 學年設定 (資料獨立)</label>
+                <div class="control">
+                    <div class="select is-small is-fullwidth">
+                        <select id="yearSelect" onchange="changeYear()">
+                            </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="field mb-3">
+                <label class="label is-small">當前顯示學期</label>
+                <div class="control">
+                    <label class="radio is-small"><input type="radio" name="semView" value="1" onchange="updateSettings()"> 上學期</label>
+                    <label class="radio is-small"><input type="radio" name="semView" value="2" onchange="updateSettings()"> 下學期</label>
+                </div>
+                <p class="help">學年課(全)在任何學期都會顯示</p>
+            </div>
+
+            <button class="button is-info is-light is-small is-fullwidth mb-3 edit-only" onclick="openCopyModal()">
+                📥 複製他學期資料
+            </button>
+
+            <hr class="my-2">
+            <p class="help mb-2">以下設定僅影響<b>週末 (週六、日)</b>。</p>
+            <label class="checkbox mr-2"><input type="checkbox" id="showSat" onchange="updateSettings()"> 週六</label>
+            <label class="checkbox"><input type="checkbox" id="showSun" onchange="updateSettings()"> 週日</label>
+            <hr class="my-2">
+            <div class="columns is-gapless is-multiline is-mobile">
+                <div class="column is-half"><label class="checkbox"><input type="checkbox" id="g1" onchange="updateSettings()"> 大一</label></div>
+                <div class="column is-half"><label class="checkbox"><input type="checkbox" id="g2" onchange="updateSettings()"> 大二</label></div>
+                <div class="column is-half"><label class="checkbox"><input type="checkbox" id="g3" onchange="updateSettings()"> 大三</label></div>
+                <div class="column is-half"><label class="checkbox"><input type="checkbox" id="g4" onchange="updateSettings()"> 大四/碩士</label></div>
+            </div>
+        </div>
+
+        <div class="courses-list-wrapper" id="courseList"></div>
+        
+        <div class="mt-auto pt-2 border-t">
+            <div style="font-size: 10px; color: #888; margin-bottom: 5px;">* 點擊下方老師標籤可設定顏色與時段</div>
+            <div id="teacherLegend" style="display: flex; flex-wrap: wrap; gap: 3px; max-height: 60px; overflow-y: auto;"></div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="top-bar level is-mobile mb-2">
+            <div class="level-left">
+                <h2 class="title is-6 mr-2" style="font-size: 1rem;">📅 東海電機排課模擬器 by HC <span id="currentYearLabel" class="tag is-primary is-light is-rounded ml-1"></span> <span id="currentSemLabel" class="tag is-info is-light is-rounded ml-1" style="font-weight:normal;"></span></h2>
+                
+                <div id="firebaseUserDisplay">
+                    <img id="userAvatar" class="user-avatar" src="" alt="">
+                    <span id="userName" style="font-size: 0.75rem; margin-right: 5px;"></span>
+                </div>
+            </div>
+            
+            <div class="level-right">
+                <div class="buttons are-small">
+                    <button id="btnLogin" class="button is-info is-outlined" style="font-size: 0.75rem;" onclick="handleLogin()">
+                        <span class="icon"><i class="fab fa-google"></i></span>
+                        <span>登入</span>
+                    </button>
+                    
+                    <button id="btnCloudLoad" class="button is-warning is-light" style="font-size: 0.75rem; display:none;" onclick="loadMyCloudData()">
+                        ☁️ 讀取雲端存檔
+                    </button>
+
+                    <button id="btnCloudSave" class="button is-link is-light edit-only" style="font-size: 0.75rem; display:none;" onclick="saveToCloud()">
+                        ☁️ 儲存
+                    </button>
+                    
+                    <button id="btnCloudShare" class="button is-link is-light" style="font-size: 0.75rem; display:none;" onclick="shareCloudLink()">
+                        🔗 產生連結
+                    </button>
+
+                    <button id="btnLogout" class="button is-danger is-light" style="font-size: 0.75rem; display:none;" onclick="handleLogout()">
+                        登出
+                    </button>
+                    
+                    <div class="dropdown is-hoverable is-right">
+                        <div class="dropdown-trigger">
+                            <button class="button is-warning is-light" style="font-size: 0.75rem;">
+                                📷 截圖下載
+                            </button>
+                        </div>
+                        <div class="dropdown-menu" role="menu">
+                            <div class="dropdown-content">
+                                <a class="dropdown-item" onclick="exportImage('png')">下載 PNG 圖片</a>
+                                <a class="dropdown-item" onclick="exportImage('pdf')">下載 PDF 文件 (A4)</a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="button is-primary is-light" style="font-size: 0.75rem;" onclick="shareToUrl()">🔗 網址備份</button>
+                    <button class="button is-success is-light" style="font-size: 0.75rem;" onclick="exportAllData()">📥 全備份導出</button>
+                    <button class="button is-link is-light edit-only" style="font-size: 0.75rem;" onclick="document.getElementById('importFile').click()">📤 導入</button>
+                    <input type="file" id="importFile" style="display: none;" accept=".txt,.json" onchange="importData(this)">
+                </div>
+            </div>
+        </div>
+
+        <div class="timetable-container" id="captureTarget">
+            <table class="timetable" id="mainTable">
+                <colgroup id="tableColGroup"></colgroup>
+                <thead id="tableHead"></thead>
+                <tbody id="tableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="courseModal">
+  <div class="modal-background" onclick="closeModal()"></div>
+  <div class="modal-card">
+    <header class="modal-card-head py-3">
+      <p class="modal-card-title is-size-6">新增課程</p>
+      <button class="delete" onclick="closeModal()"></button>
+    </header>
+    <section class="modal-card-body">
+      <div class="field"><label class="label is-small">課程名稱</label><div class="control"><input class="input is-small" type="text" id="mName" placeholder="例如: 程式設計"></div></div>
+      <div class="field"><label class="label is-small">教師姓名</label><div class="control"><input class="input is-small" type="text" id="mTeacher" placeholder="例如: 王小明"></div></div>
+      <div class="field"><label class="label is-small">節數</label><div class="control"><input class="input is-small" type="number" id="mCredits" value="3" min="1" max="8"></div></div>
+      <div class="field">
+          <label class="label is-small">開課學期</label>
+          <div class="control">
+              <label class="radio is-small"><input type="radio" name="mSem" value="1"> 上學期</label>
+              <label class="radio is-small"><input type="radio" name="mSem" value="2"> 下學期</label>
+              <label class="radio is-small"><input type="radio" name="mSem" value="3" checked> 學年課(全)</label>
+          </div>
+      </div>
+      <div class="field">
+          <label class="label is-small">課程屬性</label>
+          <div class="control">
+              <label class="radio is-small"><input type="radio" name="mType" value="required" onclick="toggleMIndependent(true)"> 必修</label>
+              <label class="radio is-small"><input type="radio" name="mType" value="elective" onclick="toggleMIndependent(false)"> 選修</label>
+              <label class="radio is-small"><input type="radio" name="mType" value="none" checked onclick="toggleMIndependent(false)"> 無</label>
+          </div>
+      </div>
+      <div class="field" id="mIndependentField" style="display:none;">
+          <label class="checkbox is-small"><input type="checkbox" id="mIndependent"> 獨立必修 (不可與全校任何課程衝堂)</label>
+      </div>
+      <div class="field">
+          <label class="label is-small">限制年級 (選填，顯示黃光)</label>
+          <div class="control" id="mGradeContainer">
+              <label class="checkbox mr-2"><input type="checkbox" value="1"> 大一</label>
+              <label class="checkbox mr-2"><input type="checkbox" value="2"> 大二</label>
+              <label class="checkbox mr-2"><input type="checkbox" value="3"> 大三</label>
+              <label class="checkbox mr-2"><input type="checkbox" value="4"> 大四/碩士</label>
+          </div>
+      </div>
+    </section>
+    <footer class="modal-card-foot py-3">
+      <button class="button is-primary is-small" onclick="addCourse()">確定新增</button>
+      <button class="button is-small" onclick="closeModal()">取消</button>
+    </footer>
+  </div>
+</div>
+
+<div class="modal" id="editCourseModal">
+    <div class="modal-background" onclick="closeEditModal()"></div>
+    <div class="modal-card">
+      <header class="modal-card-head py-3" style="background-color: #effaf5;">
+        <p class="modal-card-title is-size-6">編輯課程</p>
+        <button class="delete" onclick="closeEditModal()"></button>
+      </header>
+      <section class="modal-card-body">
+        <input type="hidden" id="eId">
+        <div class="field"><label class="label is-small">課程名稱</label><div class="control"><input class="input is-small" type="text" id="eName"></div></div>
+        <div class="field"><label class="label is-small">教師姓名</label><div class="control"><input class="input is-small" type="text" id="eTeacher"></div></div>
+        <div class="field"><label class="label is-small">節數</label>
+            <div class="control"><input class="input is-small" type="number" id="eCredits" min="1" max="8"></div>
+            <p class="help is-danger" id="eCreditsHelp">注意：修改節數將會清除該課程目前的排課時間。</p>
+        </div>
+        <div class="field">
+            <label class="label is-small">開課學期</label>
+            <div class="control">
+                <label class="radio is-small"><input type="radio" name="eSem" value="1"> 上學期</label>
+                <label class="radio is-small"><input type="radio" name="eSem" value="2"> 下學期</label>
+                <label class="radio is-small"><input type="radio" name="eSem" value="3"> 學年課(全)</label>
+            </div>
+        </div>
+        <div class="field">
+            <label class="label is-small">課程屬性</label>
+            <div class="control">
+                <label class="radio is-small"><input type="radio" name="eType" value="required" onclick="toggleEIndependent(true)"> 必修</label>
+                <label class="radio is-small"><input type="radio" name="eType" value="elective" onclick="toggleEIndependent(false)"> 選修</label>
+                <label class="radio is-small"><input type="radio" name="eType" value="none" onclick="toggleEIndependent(false)"> 無</label>
+            </div>
+        </div>
+        <div class="field" id="eIndependentField" style="display:none;">
+            <label class="checkbox is-small"><input type="checkbox" id="eIndependent"> 獨立必修 (不可與全校任何課程衝堂)</label>
+        </div>
+        <div class="field">
+            <label class="label is-small">限制年級 (選填，顯示黃光)</label>
+            <div class="control" id="eGradeContainer">
+                <label class="checkbox mr-2"><input type="checkbox" value="1"> 大一</label>
+                <label class="checkbox mr-2"><input type="checkbox" value="2"> 大二</label>
+                <label class="checkbox mr-2"><input type="checkbox" value="3"> 大三</label>
+                <label class="checkbox mr-2"><input type="checkbox" value="4"> 大四/碩士</label>
+            </div>
+        </div>
+      </section>
+      <footer class="modal-card-foot py-3">
+        <button class="button is-info is-small" onclick="submitEdit()">儲存變更</button>
+        <button class="button is-small" onclick="closeEditModal()">取消</button>
+      </footer>
+    </div>
+</div>
+
 <script>
-    const CREDITS_TARGET = {
-        "111": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "112": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "113": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "114": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 }
-    };
+    // --- Mode Selection Logic ---
+    let isReadOnly = true; 
 
-    const BASE_BASIC_COURSES = [
-        "中文", "大一英文", "大二英文", "大一體育", "大二體育", 
-        "全民國防教育", "勞作教育", "AI思維與程式設計", "程式思維與生成式AI"
-    ];
+    function selectReadOnlyMode() {
+        isReadOnly = true;
+        closeModeModal();
+        updateUIForMode();
+        Swal.fire({ icon: 'info', title: '唯讀模式', text: '您目前僅能檢視最後編輯的課表，無法進行更動。', timer: 2000, showConfirmButton: false });
+    }
 
-    const CORE_REQUIRED_COURSES = [
-        "微積分甲〈一〉", "普通物理", "程式設計", "邏輯設計", "線性代數", 
-        "邏輯設計實驗", "微積分甲〈二〉", "程式語言", 
-        "工程數學（Ⅰ）", "工程數學（Ⅱ）", 
-        "電子學（Ⅰ）", "電路學（Ⅰ）", "電工實驗（Ⅰ）", 
-        "電子學（Ⅱ）", "電路學（Ⅱ）", "電工實驗（Ⅱ）", 
-        "電磁學（Ⅰ）", "訊號與系統", "電磁學（Ⅱ）", 
-        "專題研究", "專題實作"
-    ];
-
-    const SOFT_LABS = ["工程數學軟體實習", "電子電路軟體實習", "系統軟體實習"];
-    const FORCE_GEN_ELEC_LIST = ["有機化學", "普通化學", "普通物理實驗"];
-    const DEPT_ELECTIVE_WHITELIST = ["Python程式設計", "數位系統雛型設計", "機器學習", "資料結構", "奈米材料製造與量測技術", "生醫工程導論"];
-    const DEPT_KEYWORDS = ["電子", "電機", "電路", "訊號", "系統", "半導體", "晶片", "控制", "通訊", "邏輯", "微處理", "程式", "物件導向", "演算法", "人工智慧", "深度學習", "積體電路", "光電", "電磁", "微波", "天線"];
-
-    const RULES = {
-        "111": { basic: BASE_BASIC_COURSES, required: [...CORE_REQUIRED_COURSES, ...SOFT_LABS] },
-        "112": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES },
-        "113": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES },
-        "114": { basic: BASE_BASIC_COURSES, required: CORE_REQUIRED_COURSES }
-    };
-
-    const GRADE_POINTS = { "A+": 4.3, "A": 4.0, "A-": 3.7, "B+": 3.3, "B": 3.0, "B-": 2.7, "C+": 2.3, "C": 2.0, "C-": 1.7, "D": 1.0, "E": 0, "F": 0, "X": 0 };
-
-    let parsedStudentData = [];
-    let exceptionMap = {}; 
-    let courseDatabase = {}; 
-
-    window.onload = async function() {
-        const dbStatus = document.getElementById('dbStatus');
-        const years = [111, 112, 113, 114];
-        const sems = [1, 2];
-        const systems = ['A', 'M']; 
-        let filesToFetch = [];
-
-        years.forEach(y => sems.forEach(s => systems.forEach(sys => filesToFetch.push(`${y}${s}${sys}-data.json`))));
-
-        let successCount = 0;
-        const requests = filesToFetch.map(fileName => 
-            fetch(`./COURSE/${fileName}`).then(res => res.ok ? res.json().then(j => ({n:fileName, j})) : null).catch(()=>null)
-        );
-
-        const results = await Promise.all(requests);
-        results.forEach(item => {
-            if (item) {
-                successCount++;
-                const m = item.n.match(/^(\d{3})(\d)[A-Za-z]/);
-                if (m) processJsonToDB(item.j, m[1], m[2]);
-            }
+    async function selectEditMode() {
+        const { value: password } = await Swal.fire({
+            title: '請輸入編輯密碼',
+            input: 'password',
+            inputPlaceholder: '請輸入密碼', 
+            showCancelButton: true,
+            confirmButtonText: '驗證',
+            cancelButtonText: '取消'
         });
 
-        if (successCount > 0) {
-            dbStatus.innerText = `✅ 系統就緒 (已載入 ${successCount} 個開課檔)`;
-            dbStatus.className = "status-ready";
+        if (password && password.toUpperCase() === 'THUEE33900') {
+            isReadOnly = false;
+            closeModeModal();
+            updateUIForMode();
+            Swal.fire({ icon: 'success', title: '密碼正確', text: '已切換至編輯模式', timer: 1500, showConfirmButton: false });
+        } else if (password !== undefined) {
+            Swal.fire('密碼錯誤', '無法進入編輯模式', 'error');
+        }
+    }
+
+    function closeModeModal() {
+        document.getElementById('modeSelectionModal').classList.remove('is-active');
+    }
+
+    function updateUIForMode() {
+        if (isReadOnly) {
+            document.body.classList.add('read-only-mode');
         } else {
-            dbStatus.innerText = "⚠️ 未偵測到開課檔";
+            document.body.classList.remove('read-only-mode');
         }
+        
+        // Re-check auth UI visibility based on mode
+        updateAuthUI(currentUser);
+        render(); 
+    }
+
+    // --- Firebase Initialization ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAlx1ZWWjvgxMi9vsw-XzYd9mTS6ilI3lY",
+        authDomain: "thuee-c83e7.firebaseapp.com",
+        projectId: "thuee-c83e7",
+        storageBucket: "thuee-c83e7.firebasestorage.app",
+        messagingSenderId: "1063795599826",
+        appId: "1:1063795599826:web:cb2ae5a8b29179992d400b",
+        measurementId: "G-G24008NCWR"
     };
 
-    function processJsonToDB(json, year, sem) {
-        for (let key in json) {
-            const c = json[key];
-            const code = c.selection_id || c.course_code;
-            if (code) courseDatabase[`${year}-${sem}-${code}`] = c;
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+    let currentUser = null;
+
+    auth.onAuthStateChanged((user) => {
+        currentUser = user;
+        updateAuthUI(user);
+    });
+
+    function updateAuthUI(user) {
+        const btnLogin = document.getElementById('btnLogin');
+        const btnLogout = document.getElementById('btnLogout');
+        const btnCloudSave = document.getElementById('btnCloudSave');
+        const btnCloudLoad = document.getElementById('btnCloudLoad'); 
+        const btnCloudShare = document.getElementById('btnCloudShare');
+        const userDisplay = document.getElementById('firebaseUserDisplay');
+        const userAvatar = document.getElementById('userAvatar');
+        const userName = document.getElementById('userName');
+
+        if (user) {
+            btnLogin.style.display = 'none';
+            btnLogout.style.display = 'inline-flex';
+            
+            // Only show Save if in Edit Mode
+            if (!isReadOnly) {
+                btnCloudSave.style.display = 'inline-flex';
+            } else {
+                btnCloudSave.style.display = 'none';
+            }
+            
+            btnCloudLoad.style.display = 'inline-flex'; 
+            btnCloudShare.style.display = 'inline-flex';
+            userDisplay.style.display = 'flex';
+            userAvatar.src = user.photoURL;
+            userName.textContent = user.displayName;
+        } else {
+            btnLogin.style.display = 'inline-flex';
+            btnLogout.style.display = 'none';
+            btnCloudSave.style.display = 'none';
+            btnCloudLoad.style.display = 'none';
+            btnCloudShare.style.display = 'none';
+            userDisplay.style.display = 'none';
         }
     }
 
-    function downloadTemplate() {
-        const data = [
-            ["學年度", "學期", "選課代號", "科目名稱", "學分", "GPA"],
-            ["112", "上", "1234", "範例課程請刪除", "3", "A"]
-        ];
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.aoa_to_sheet(data);
-        XLSX.utils.book_append_sheet(wb, ws, "成績單範例");
-        XLSX.writeFile(wb, "成績單範例.xlsx");
-    }
-
-    function processFileAndAnalyze() {
-        const fileInput = document.getElementById('studentFile');
-        const file = fileInput.files[0];
-        if (!file) { alert("請先選擇檔案！"); return; }
-
-        const fileName = file.name.split('.')[0]; 
-        const greetingEl = document.getElementById('greetingDisplay');
-        greetingEl.innerText = `👋 ${fileName} 你好`;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                if (!sheetName) throw new Error("Excel/CSV 檔案中找不到工作表");
-                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
-                parsedStudentData = normalizeData(jsonData);
-                parsedStudentData = deduplicateData(parsedStudentData);
-                analyze();
-            } catch (err) { 
-                console.error(err);
-                alert("檔案讀取失敗: " + err.message + "\n請確認檔案未損壞且格式正確。"); 
+    function handleLogin() {
+        auth.signInWithPopup(provider).catch((error) => {
+            console.error(error);
+            if(error.code === 'auth/unauthorized-domain') {
+                Swal.fire({
+                    title: '登入失敗：網域未授權',
+                    html: '<p style="text-align:left;">Firebase 安全性設定阻擋了此請求。</p><br><p style="text-align:left;font-size:0.9em;">請至 <a href="https://console.firebase.google.com/" target="_blank">Firebase Console</a> > Authentication > Settings > Authorized Domains，將您目前的網域 (例如 github.io) 加入白名單。</p>',
+                    icon: 'error'
+                });
+            } else {
+                Swal.fire('登入失敗', error.message, 'error');
             }
-        };
-        reader.readAsArrayBuffer(file); 
-    }
-
-    function normalizeData(jsonData) {
-        return jsonData.map(rawRow => {
-            const row = {};
-            for (let k in rawRow) { row[k.trim()] = rawRow[k]; }
-            return {
-                year: String(row['學年度'] || row['year'] || "").trim(),
-                sem: String(row['學期'] || row['semester'] || "").trim(),
-                code: String(row['選課代號'] || row['code'] || "").trim(),
-                name: String(row['科目名稱'] || row['name'] || "").trim(),
-                credit: parseFloat(row['學分'] || row['credits'] || 0),
-                gpa: String(row['GPA'] || row['gpa'] || "").trim()
-            };
-        }).filter(item => item.name);
-    }
-
-    function deduplicateData(data) {
-        const map = new Map();
-        data.forEach(item => {
-            const normName = normalizeName(item.name);
-            const key = normName + "_" + item.sem; 
-            const itemPoint = getGradePoint(item.gpa);
-            if (map.has(key)) {
-                const exist = map.get(key);
-                const existPoint = getGradePoint(exist.gpa);
-                if (itemPoint > existPoint) { map.set(key, item); }
-                else if (itemPoint === existPoint) {
-                    if (parseInt(item.year) > parseInt(exist.year)) map.set(key, item);
-                }
-            } else { map.set(key, item); }
         });
-        return Array.from(map.values()).sort((a,b) => (parseInt(a.year)*10+(a.sem==='上'?1:2)) - (parseInt(b.year)*10+(b.sem==='上'?1:2)));
     }
 
-    function getGradePoint(grade) { return GRADE_POINTS[grade] !== undefined ? GRADE_POINTS[grade] : -1; }
-
-    // 核心修正：標準化名稱 (去除空白與全形冒號)
-    function normalizeName(name) {
-        if (!name) return "";
-        return name.trim().replace(/\s+/g, "").replace(/（/g, "(").replace(/）/g, ")").replace(/〈/g, "(").replace(/〉/g, ")").replace(/Ⅰ/g, "I").replace(/Ⅱ/g, "II").replace(/：/g, ":");
+    function handleLogout() {
+        auth.signOut().then(() => {
+            Swal.fire('已登出', '', 'success');
+        });
     }
 
-    function isSameName(sName, rName) { return normalizeName(sName) === normalizeName(rName); }
-    function isBasicCourse(name, list) { return list.some(b => normalizeName(name).includes(normalizeName(b))); }
+    async function saveToCloud() {
+        if (!currentUser) return;
+        if (isReadOnly) return; 
+        
+        const data = {
+            [`courses_${currentYear}`]: courses,
+            [`schedule_${currentYear}`]: schedule,
+            [`teacherColors_${currentYear}`]: teacherColors,
+            [`teacherTextColors_${currentYear}`]: teacherTextColors,
+            [`teacherAvailability_${currentYear}`]: teacherAvailability,
+            settings: settings, 
+            collapsedTeachers: collapsedTeachers,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            ownerName: currentUser.displayName,
+            ownerEmail: currentUser.email,
+            lastActiveYear: currentYear
+        };
+
+        try {
+            Swal.showLoading();
+            await db.collection('timetables').doc(currentUser.uid).set(data, { merge: true });
+            Swal.fire('儲存成功', `您的 ${currentYear} 學年課表已儲存至雲端。`, 'success');
+        } catch (e) {
+            console.error(e);
+            Swal.fire('儲存失敗', '請確認 Firebase Firestore Rules 已開啟寫入權限。', 'error');
+        }
+    }
+
+    async function loadMyCloudData() {
+        if (!currentUser) return;
+        loadFromCloud(currentUser.uid);
+    }
+
+    function shareCloudLink() {
+        if (!currentUser) return;
+        const url = window.location.origin + window.location.pathname + "?uid=" + currentUser.uid + "&year=" + currentYear;
+        navigator.clipboard.writeText(url).then(() => {
+            Swal.fire({
+                title: '連結已複製！',
+                html: '請將此連結傳給他人，對方即可檢視您的課表。<br><span style="font-size:0.8em;color:#666;">(若對方未看到，請確認資料已上傳)</span>',
+                icon: 'success',
+                footer: `<a href="${url}" target="_blank">${url}</a>`
+            });
+        });
+    }
+
+    async function loadFromCloud(uid, specificYear) {
+        try {
+            Swal.fire({ title: '正在載入雲端課表...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const doc = await db.collection('timetables').doc(uid).get();
+            if (doc.exists) {
+                const data = doc.data();
+                
+                let yearToLoad = specificYear || data.lastActiveYear || 114;
+                if(specificYear) yearToLoad = parseInt(specificYear);
+                
+                currentYear = yearToLoad;
+                document.getElementById('yearSelect').value = currentYear;
+                
+                let keySuffix = `_${currentYear}`;
+                
+                if (data[`courses${keySuffix}`]) courses = data[`courses${keySuffix}`];
+                if (data[`schedule${keySuffix}`]) schedule = data[`schedule${keySuffix}`];
+                if (data[`teacherColors${keySuffix}`]) teacherColors = data[`teacherColors${keySuffix}`];
+                if (data[`teacherTextColors${keySuffix}`]) teacherTextColors = data[`teacherTextColors${keySuffix}`];
+                if (data[`teacherAvailability${keySuffix}`]) teacherAvailability = data[`teacherAvailability${keySuffix}`];
+                
+                if (data.settings) settings = data.settings;
+                if (data.collapsedTeachers) collapsedTeachers = data.collapsedTeachers;
+                
+                if(!isReadOnly) save(); // Only save locally if in edit mode
+                render();
+                
+                let owner = data.ownerName || "未知使用者";
+                Swal.fire('載入成功', `已成功載入 ${owner} 的 ${currentYear} 學年課表。`, 'success');
+            } else {
+                Swal.fire('找不到資料', '雲端尚無資料或權限不足。', 'warning');
+            }
+        } catch (e) {
+            console.error(e);
+            Swal.fire('載入錯誤', '讀取資料時發生錯誤，請檢查 Firestore Rules。', 'error');
+        }
+    }
+
+    // --- Main Logic ---
+
+    const SOFT_COLORS = ['#FFB3BA', '#BAE1FF', '#FFFFBA', '#BAE1BA', '#FFD7BA', '#E1BAFF', '#BAE1E1', '#FFE1BA', '#FFB3D9', '#B3E5FF', '#C8E6C9', '#FFE0B2', '#F8BBD0', '#D1C4E9', '#B2DFDB'];
     
-    // 嚴格通識判定：只看「開頭」是否符合
-    function isGeneralEd(name) {
-        const n = normalizeName(name); // 已處理冒號
-        const strictPrefixes = [
-            "人文", "社會", "自然", 
-            "文明與經典", "領導與倫理", "議題導向", "永續實踐"
-        ];
-        return strictPrefixes.some(pre => n.startsWith(pre));
+    const PERIODS = [
+        {id:'1', t:'08:10'}, {id:'2', t:'09:10'}, {id:'3', t:'10:20'}, {id:'4', t:'11:20'},
+        {id:'N', t:'12:10'}, {id:'5', t:'13:10'}, {id:'6', t:'14:10'}, {id:'7', t:'15:20'},
+        {id:'8', t:'16:20'}, {id:'9', t:'17:20'}
+    ];
+
+    const DEPT_REQ_DATA = [
+        { name: "勞作", grade: 1, days: [1,2,3,4,5], periods: ['5'], sem: 3 },
+        { name: "英文", grade: 1, days: [1,3], periods: ['3','4'], sem: 3 },
+        { name: "英文", grade: 2, days: [5], periods: ['1','2'], sem: 2 }, 
+        { name: "國文", grade: 1, days: [5], periods: ['8','9'], sem: 3 },
+        { name: "體育", grade: 1, days: [3], periods: ['1','2'], sem: 3 },
+        { name: "體育", grade: 2, days: [4], periods: ['5','6'], sem: 3 }
+    ];
+
+    let currentYear = parseInt(localStorage.getItem('lastActiveYear')) || 114;
+    
+    const yearSelect = document.getElementById('yearSelect');
+    for(let y=114; y<=120; y++) {
+        let opt = document.createElement('option');
+        opt.value = y;
+        opt.innerText = `${y} 學年度`;
+        if(y === currentYear) opt.selected = true;
+        yearSelect.appendChild(opt);
     }
 
-    function isForceGenElective(name) { return FORCE_GEN_ELEC_LIST.some(f => normalizeName(name).includes(normalizeName(f))); }
-    function isDeptElective(name, credit) {
-        const n = normalizeName(name);
-        if (DEPT_ELECTIVE_WHITELIST.some(w => n.includes(normalizeName(w)))) return true;
-        return (credit >= 3 && DEPT_KEYWORDS.some(k => n.includes(k)));
+    function getStorageKey(baseKey) {
+        return `${baseKey}_${currentYear}`;
     }
 
-    function analyze() {
-        if (parsedStudentData.length === 0) return alert("讀取到的資料為空。");
+    let courses = [];
+    let schedule = {}; 
+    let teacherColors = {};
+    let teacherAvailability = {};
+    let teacherTextColors = {}; 
+    
+    let settings = JSON.parse(localStorage.getItem('settings')) || {
+        sat: true, sun: false, wd: [true,true,true,true], we: [true,true,true,true], currentSemester: 1
+    };
+    if (!settings.currentSemester) settings.currentSemester = 1;
+    let collapsedTeachers = JSON.parse(localStorage.getItem('collapsedTeachers')) || [];
 
-        const year = document.getElementById('admissionYear').value;
-        const rule = RULES[year];
-        const target = CREDITS_TARGET[year];
+    function loadDataForYear() {
+        courses = JSON.parse(localStorage.getItem(getStorageKey('courses'))) || [];
+        schedule = JSON.parse(localStorage.getItem(getStorageKey('schedule'))) || {};
+        teacherColors = JSON.parse(localStorage.getItem(getStorageKey('teacherColors'))) || {};
+        teacherAvailability = JSON.parse(localStorage.getItem(getStorageKey('teacherAvailability'))) || {};
+        teacherTextColors = JSON.parse(localStorage.getItem(getStorageKey('teacherTextColors'))) || {};
         
-        let stats = {
-            basic: { cred: 0, count: 0, details: { chi:0, eng:0, mil:0, pe:0 } },
-            req: { cred: 0, count: 0 },
-            deptElec: { cred: 0, count: 0 },
-            deptElecLab: { cred: 0, count: 0 },
-            genElec: { cred: 0, count: 0 },
-            genEd: { cred: 0, count: 0, domains: { hu: false, so: false, na: false } },
-            total: 0
+        if (!settings.currentSemester) settings.currentSemester = 1;
+        
+        render();
+    }
+
+    // Initial load happens, but render is called after mode selection implicitly via updateUIForMode or manual triggers
+    loadDataForYear();
+
+    function changeYear() {
+        // Only save if in edit mode
+        if(!isReadOnly) save();
+        
+        currentYear = parseInt(document.getElementById('yearSelect').value);
+        localStorage.setItem('lastActiveYear', currentYear);
+        
+        loadDataForYear();
+        
+        Swal.fire({
+            title: `已切換至 ${currentYear} 學年度`,
+            icon: 'info',
+            timer: 1000,
+            showConfirmButton: false
+        });
+    }
+
+    function openCopyModal() {
+        if (isReadOnly) return;
+        let yearOptions = '';
+        for(let y=114; y<=120; y++) {
+            if(y !== currentYear) {
+                yearOptions += `<option value="${y}">${y} 學年度</option>`;
+            }
+        }
+        
+        if (yearOptions === '') yearOptions = '<option disabled>無其他學年可選</option>';
+
+        Swal.fire({
+            title: '複製他學期資料',
+            html: `
+                <div class="field">
+                    <label class="label">來源學年</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="copyFromYear">${yearOptions}</select>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label class="label">來源學期</label>
+                    <div class="control">
+                        <div class="select is-fullwidth">
+                            <select id="copyFromSem">
+                                <option value="1">上學期 (第1學期)</option>
+                                <option value="2">下學期 (第2學期)</option>
+                                <option value="3">整學年 (全)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <p class="help is-info">注意：複製過來的課程將加入左側列表，不會覆蓋現有排程。</p>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '開始複製',
+            cancelButtonText: '取消',
+            preConfirm: () => {
+                const srcYear = document.getElementById('copyFromYear').value;
+                const srcSem = document.getElementById('copyFromSem').value;
+                return { srcYear, srcSem };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                performCopy(result.value.srcYear, result.value.srcSem);
+            }
+        });
+    }
+
+    function performCopy(srcYear, srcSem) {
+        let srcCourses = JSON.parse(localStorage.getItem(`courses_${srcYear}`)) || [];
+        
+        if (srcCourses.length === 0) {
+            Swal.fire('查無資料', `${srcYear} 學年度沒有資料可複製。`, 'warning');
+            return;
+        }
+
+        let count = 0;
+        let targetSem = parseInt(settings.currentSemester); 
+        srcSem = parseInt(srcSem);
+
+        srcCourses.forEach(c => {
+            let cSem = c.semester || 3;
+            let shouldCopy = false;
+            
+            if (srcSem === 3) {
+                if (cSem === 3) shouldCopy = true;
+            } else {
+                if (cSem === srcSem || cSem === 3) shouldCopy = true;
+            }
+
+            if (shouldCopy) {
+                let newCourse = JSON.parse(JSON.stringify(c));
+                newCourse.id = Date.now() + Math.random().toString();
+                if (newCourse.parentId) newCourse.parentId = null; 
+                newCourse.isSplit = false; 
+                
+                if (cSem !== 3) {
+                    newCourse.semester = targetSem;
+                }
+
+                if (newCourse.isDeptReq) {
+                    newCourse.id = `copied_${srcYear}_${Date.now()}_${Math.random()}`;
+                }
+
+                courses.push(newCourse);
+                
+                if (!teacherColors[newCourse.teacher]) {
+                    let srcColors = JSON.parse(localStorage.getItem(`teacherColors_${srcYear}`)) || {};
+                    if (srcColors[newCourse.teacher]) {
+                        teacherColors[newCourse.teacher] = srcColors[newCourse.teacher];
+                    } else {
+                        teacherColors[newCourse.teacher] = SOFT_COLORS[Object.keys(teacherColors).length % SOFT_COLORS.length];
+                    }
+                }
+                count++;
+            }
+        });
+
+        save();
+        render();
+        Swal.fire('複製完成', `已成功從 ${srcYear} 學年度複製 ${count} 門課程至列表。`, 'success');
+    }
+
+    function exportImage(type) {
+        const element = document.getElementById('captureTarget');
+        const sidebar = document.getElementById('sidebar');
+        const appContainer = document.getElementById('appContainer');
+
+        const originalSidebarDisplay = sidebar.style.display;
+        const originalContainerWidth = appContainer.style.width;
+        const originalContainerMaxWidth = appContainer.style.maxWidth;
+        const originalElementWidth = element.style.width;
+        const originalElementOverflow = element.style.overflow;
+
+        sidebar.style.display = 'none';
+        
+        appContainer.style.width = '2000px'; 
+        appContainer.style.maxWidth = 'none'; 
+
+        element.style.width = '2000px';
+        element.style.overflow = 'visible';
+        
+        document.body.style.backgroundColor = '#e0e0e0';
+
+        render();
+
+        Swal.fire({
+            title: '處理中...',
+            text: '正在產生高解析度圖片，請稍候',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        setTimeout(() => {
+            html2canvas(element, { 
+                scale: 2, 
+                useCORS: true,
+                width: 2000, 
+                windowWidth: 2000 
+            }).then(canvas => {
+                sidebar.style.display = originalSidebarDisplay;
+                appContainer.style.width = originalContainerWidth;
+                appContainer.style.maxWidth = originalContainerMaxWidth;
+                element.style.width = originalElementWidth;
+                element.style.overflow = originalElementOverflow;
+                document.body.style.backgroundColor = '';
+                render(); 
+
+                let semLabel = settings.currentSemester == 1 ? "上學期" : "下學期";
+                let filename = `我的課表_${currentYear}學年_${semLabel}_${new Date().toISOString().slice(0,10)}`;
+
+                if (type === 'png') {
+                    const link = document.createElement('a');
+                    link.download = `${filename}.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                    Swal.close();
+                } else if (type === 'pdf') {
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF('l', 'mm', 'a4');
+                    
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgProps = doc.getImageProperties(imgData);
+                    
+                    const pdfWidth = doc.internal.pageSize.getWidth();
+                    const pdfHeight = doc.internal.pageSize.getHeight();
+                    
+                    const ratio = pdfWidth / imgProps.width;
+                    const imgHeight = imgProps.height * ratio;
+                    
+                    let y = (pdfHeight - imgHeight) / 2;
+                    if (y < 0) y = 0;
+
+                    doc.addImage(imgData, 'PNG', 0, y, pdfWidth, imgHeight);
+                    doc.save(`${filename}.pdf`);
+                    Swal.close();
+                }
+            }).catch(err => {
+                console.error(err);
+                sidebar.style.display = originalSidebarDisplay;
+                appContainer.style.width = originalContainerWidth;
+                appContainer.style.maxWidth = originalContainerMaxWidth;
+                element.style.width = originalElementWidth;
+                element.style.overflow = originalElementOverflow;
+                document.body.style.backgroundColor = '';
+                render();
+                Swal.fire('錯誤', '圖片產生失敗', 'error');
+            });
+        }, 100); 
+    }
+
+    function checkUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const uid = urlParams.get('uid');
+        const compressed = urlParams.get('data');
+        const loadYear = urlParams.get('year');
+
+        if (uid) {
+            loadFromCloud(uid, loadYear);
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (compressed) {
+            loadFromLZString(compressed);
+        }
+    }
+
+    function shareToUrl() {
+        let data = {
+            courses: courses,
+            schedule: schedule,
+            teacherColors: teacherColors,
+            teacherTextColors: teacherTextColors,
+            teacherAvailability: teacherAvailability,
+            settings: settings,
+            collapsedTeachers: collapsedTeachers,
+            year: currentYear
         };
-
-        let lists = { basic: [], req: [], deptElec: [], deptElecLab: [], genElec: [], genEd: [], fail: [] };
-        let reqCheckList = rule.required.map(r => ({ name: r, matched: false, log: null }));
         
-        let totalPoints = 0, totalGpaCredits = 0;
-
-        parsedStudentData.forEach(rec => {
-            const passGrades = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', '抵免', '通過'];
-            const pts = getGradePoint(rec.gpa);
-            if (pts >= 0) { totalPoints += pts * rec.credit; totalGpaCredits += rec.credit; }
-
-            if (!passGrades.includes(rec.gpa)) { lists.fail.push(rec); return; }
-
-            let cat = "Unknown";
-            const normName = normalizeName(rec.name);
-
-            if (exceptionMap[normName]) {
-                cat = exceptionMap[normName];
-                if (cat === 'Required') {
-                    for (let r of reqCheckList) { if (!r.matched && isSameName(rec.name, r.name)) { r.matched = true; r.log = rec; break; } }
-                }
-            } 
-            else {
-                if (isBasicCourse(rec.name, rule.basic)) cat = "Basic";
-                else {
-                    let matched = false;
-                    for (let r of reqCheckList) {
-                        if (!r.matched && isSameName(rec.name, r.name)) {
-                            cat = "Required"; r.matched = true; r.log = rec; matched = true; break;
-                        }
-                    }
-                    if (!matched) {
-                        if (isGeneralEd(rec.name)) cat = "GenEd";
-                        else if (isForceGenElective(rec.name)) cat = "GeneralElective";
-                        else {
-                            const isLabKey = rec.name.includes("實驗") || rec.name.includes("實作");
-                            const exclude = rec.name.includes("工程數學") || rec.name.includes("電路學") || rec.name.includes("電子學") || rec.name.includes("實務探索");
-                            if (rec.credit === 1 && isLabKey && !exclude) cat = "DeptElectiveLab";
-                            else if (isDeptElective(rec.name, rec.credit)) cat = "DeptElective";
-                            else cat = "GeneralElective";
-                        }
-                    }
-                }
-            }
-
-            stats.total += rec.credit;
-            if (cat === "Basic") { 
-                lists.basic.push(rec); stats.basic.cred += rec.credit; stats.basic.count++;
-                if (rec.name.includes("中文")) stats.basic.details.chi++;
-                else if (rec.name.includes("英文")) stats.basic.details.eng++;
-                else if (rec.name.includes("軍訓") || rec.name.includes("全民國防")) stats.basic.details.mil++;
-                else if (rec.name.includes("體育")) stats.basic.details.pe++;
-            }
-            else if (cat === "Required") { lists.req.push(rec); stats.req.cred += rec.credit; stats.req.count++; }
-            else if (cat === "DeptElective") { lists.deptElec.push(rec); stats.deptElec.cred += rec.credit; stats.deptElec.count++; }
-            else if (cat === "DeptElectiveLab") { lists.deptElecLab.push(rec); stats.deptElec.cred += rec.credit; stats.deptElecLab.count++; } 
-            else if (cat === "GenEd") { 
-                lists.genEd.push(rec); stats.genEd.cred += rec.credit; stats.genEd.count++; 
-                // 嚴格前綴判定領域 (不再亂搜關鍵字)
-                if (normName.startsWith("人文")) stats.genEd.domains.hu = true;
-                if (normName.startsWith("社會")) stats.genEd.domains.so = true;
-                if (normName.startsWith("自然")) stats.genEd.domains.na = true;
-                // 文明與經典歸人文，領導與倫理歸社會 (依慣例，若有誤可調整)
-                if (normName.startsWith("文明與經典")) stats.genEd.domains.hu = true;
-                if (normName.startsWith("領導與倫理")) stats.genEd.domains.so = true;
-                // 議題導向與永續通常有對應領域，但若無標示則只算學分，不亮特定燈號
-            }
-            else if (cat === "GeneralElective") { lists.genElec.push(rec); stats.genElec.cred += rec.credit; stats.genElec.count++; }
-        });
-
-        const finalGpa = totalGpaCredits > 0 ? (totalPoints / totalGpaCredits).toFixed(2) : "0.00";
-        updateDashboard(stats, target, reqCheckList, finalGpa, totalGpaCredits);
-        renderTables(lists, reqCheckList);
-        renderMissingSummary(stats, target, reqCheckList);
+        try {
+            let jsonString = JSON.stringify(data);
+            let compressed = LZString.compressToEncodedURIComponent(jsonString);
+            let url = window.location.origin + window.location.pathname + "?data=" + compressed;
+            
+            navigator.clipboard.writeText(url).then(() => {
+                Swal.fire({
+                    title: '網址連結已複製！',
+                    text: `此連結包含 ${currentYear} 學年度資料。`,
+                    icon: 'success',
+                    footer: '<a href="' + url + '" target="_blank">點此直接開啟</a>'
+                });
+            });
+        } catch (e) {
+            Swal.fire('錯誤', '資料過大無法生成網址，請使用全備份導出功能。', 'error');
+        }
     }
 
-    function updateDashboard(stats, target, reqCheckList, gpa, gpaCount) {
-        document.getElementById('result-section').classList.remove('hidden');
+    function loadFromLZString(compressed) {
+        try {
+            let jsonString = LZString.decompressFromEncodedURIComponent(compressed);
+            let data = JSON.parse(jsonString);
+            
+            if (data.year) {
+                currentYear = parseInt(data.year);
+                document.getElementById('yearSelect').value = currentYear;
+                localStorage.setItem('lastActiveYear', currentYear);
+            }
 
-        updateCard('basic', stats.basic.cred, target.basic, stats.basic.count);
-        const d = stats.basic.details;
-        document.getElementById('basicDetailText').innerHTML = `中文:${d.chi}/2 ${d.chi>=2?'✔':'❌'} | 英文:${d.eng}/4 ${d.eng>=4?'✔':'❌'}<br>軍訓:${d.mil}/1 ${d.mil>=1?'✔':'❌'} | 體育:${d.pe}/4 ${d.pe>=4?'✔':'❌'}`;
-        const isBasicAllPass = (d.chi>=2 && d.eng>=4 && d.mil>=1 && d.pe>=4);
-        document.getElementById('basicStatus').className = `dash-status ${isBasicAllPass?'status-ok':'status-ng'}`;
-        document.getElementById('basicStatus').innerText = isBasicAllPass ? "已完成" : "未完成";
-
-        document.getElementById('reqTarget').innerText = target.req;
-        updateCard('req', stats.req.cred, target.req, stats.req.count, reqCheckList.length);
-
-        const isElecPass = stats.deptElec.cred >= target.deptElec && stats.deptElecLab.count >= 1;
-        document.getElementById('deptElecCred').innerText = stats.deptElec.cred;
-        document.getElementById('deptElecStatus').className = `dash-status ${isElecPass?'status-ok':'status-ng'}`;
-        document.getElementById('deptElecStatus').innerText = isElecPass ? "達標" : "未達標";
-        document.getElementById('labStatusText').innerHTML = `實驗課: ${stats.deptElecLab.count} 門 (需 >= 1) ${stats.deptElecLab.count>=1?'✅':'❌'}`;
-
-        updateCard('genEd', stats.genEd.cred, target.genEd, stats.genEd.count);
-        const gd = stats.genEd.domains;
-        document.getElementById('geTagHu').className = `ge-tag ${gd.hu ? 'active' : ''}`;
-        document.getElementById('geTagSo').className = `ge-tag ${gd.so ? 'active' : ''}`;
-        document.getElementById('geTagNa').className = `ge-tag ${gd.na ? 'active' : ''}`;
-        
-        const isGenEdOk = stats.genEd.cred >= target.genEd && gd.hu && gd.so && gd.na;
-        const geStatEl = document.getElementById('genEdStatus');
-        geStatEl.className = `dash-status ${isGenEdOk?'status-ok':'status-ng'}`;
-        geStatEl.innerText = isGenEdOk ? "已完成" : "未完成";
-
-        document.getElementById('gpaValue').innerText = gpa;
-        document.getElementById('gpaCount').innerText = gpaCount;
-
-        const peOk = document.getElementById('chkPE').checked;
-        const laborOk = document.getElementById('chkLabor').checked;
-        document.getElementById('peStatusText').innerHTML = `體育門檻：${peOk ? '✅ 通過' : '❌ 未通過'}`;
-        document.getElementById('laborStatusText').innerHTML = `勞作教育：${laborOk ? '✅ 通過' : '❌ 未通過'}`;
-        
-        const isTotalOk = stats.total >= target.total;
-        document.getElementById('gradStatus').className = `dash-status ${isTotalOk?'status-ok':'status-ng'}`;
-        document.getElementById('gradStatus').innerText = isTotalOk ? "達標" : "未滿";
-        document.getElementById('totalCred').innerText = stats.total;
-        document.getElementById('genElecCred').innerText = stats.genElec.cred;
+            if (data.courses) courses = data.courses;
+            if (data.schedule) schedule = data.schedule;
+            if (data.teacherColors) teacherColors = data.teacherColors;
+            if (data.teacherTextColors) teacherTextColors = data.teacherTextColors;
+            if (data.teacherAvailability) teacherAvailability = data.teacherAvailability;
+            if (data.settings) settings = data.settings;
+            if (data.collapsedTeachers) collapsedTeachers = data.collapsedTeachers;
+            
+            if(!isReadOnly) save();
+            render();
+            Swal.fire({
+                title: '資料還原成功',
+                text: `已還原 ${currentYear} 學年度資料。`,
+                icon: 'success',
+                timer: 1500,
+                showConfirmButton: false
+            });
+            window.history.replaceState({}, document.title, window.location.pathname);
+        } catch (e) {
+            console.error(e);
+            Swal.fire('錯誤', '無效的分享連結', 'error');
+        }
     }
 
-    function renderMissingSummary(stats, target, reqCheckList) {
-        const container = document.getElementById('missing-content');
-        const peOk = document.getElementById('chkPE').checked;
-        const laborOk = document.getElementById('chkLabor').checked;
-        let msgs = [];
+    function toggleMIndependent(show) {
+        document.getElementById('mIndependentField').style.display = show ? 'block' : 'none';
+        if(!show) document.getElementById('mIndependent').checked = false;
+    }
+    function toggleEIndependent(show) {
+        document.getElementById('eIndependentField').style.display = show ? 'block' : 'none';
+        if(!show) document.getElementById('eIndependent').checked = false;
+    }
 
-        const d = stats.basic.details;
-        if (d.chi < 2) msgs.push(`基礎: 中文尚缺 ${2 - d.chi} 門`);
-        if (d.eng < 4) msgs.push(`基礎: 英文尚缺 ${4 - d.eng} 門`);
-        if (d.mil < 1) msgs.push(`基礎: 軍訓/國防尚缺 1 門`);
-        if (d.pe < 4) msgs.push(`基礎: 體育尚缺 ${4 - d.pe} 門`);
-
-        if (stats.req.cred < target.req) msgs.push(`系必修: 學分不足 (目前 ${stats.req.cred}/${target.req})`);
-        reqCheckList.forEach(r => { if (!r.matched) msgs.push(`必修缺課: ${r.name}`); });
-
-        if (stats.deptElec.cred < target.deptElec) msgs.push(`系選修: 學分不足，尚缺 ${target.deptElec - stats.deptElec.cred} 學分`);
-        if (stats.deptElecLab.count < 1) msgs.push(`系選修: 缺少實驗課程 (需至少 1 門)`);
-
-        if (stats.genEd.cred < target.genEd) msgs.push(`通識: 學分不足 (目前 ${stats.genEd.cred}/${target.genEd})`);
-        if (!stats.genEd.domains.hu) msgs.push(`通識: 缺少 [人文] 領域課程`);
-        if (!stats.genEd.domains.so) msgs.push(`通識: 缺少 [社會] 領域課程`);
-        if (!stats.genEd.domains.na) msgs.push(`通識: 缺少 [自然] 領域課程`);
-
-        if (!peOk) msgs.push(`畢業門檻: 體育門檻未勾選`);
-        if (!laborOk) msgs.push(`畢業門檻: 勞作教育未勾選`);
-
-        if (stats.total < target.total) msgs.push(`畢業總學分: 不足，尚差 ${target.total - stats.total} 學分`);
-
-        if (msgs.length === 0) {
-            container.innerHTML = `<div class="congrats-msg">🎉 恭喜！目前系統檢查所有項目皆已達標！</div>`;
+    function toggleDeptReqs() {
+        if(isReadOnly) return;
+        let exists = courses.some(c => c.isDeptReq);
+        if (exists) {
+            let idsToRemove = courses.filter(c => c.isDeptReq).map(c => c.id);
+            courses = courses.filter(c => !c.isDeptReq);
+            Object.keys(schedule).forEach(key => {
+                schedule[key] = schedule[key].filter(id => !idsToRemove.includes(id));
+                if(schedule[key].length === 0) delete schedule[key];
+            });
+            Swal.fire('已移除', '電機系校必修已移除', 'success');
         } else {
-            let html = "";
-            msgs.forEach(m => html += `<div class="missing-item">${m}</div>`);
-            container.innerHTML = html;
+            let newCourses = [];
+            let conflictCount = 0;
+            DEPT_REQ_DATA.forEach((req, idx) => {
+                let reqId = `dept_req_${idx}_${Date.now()}`;
+                let reqSem = req.sem || 3; 
+                
+                req.days.forEach(d => {
+                    req.periods.forEach(p => {
+                        let key = `${d}-${req.grade}-${p}`;
+                        if (schedule[key] && schedule[key].length > 0) {
+                            conflictCount += schedule[key].length;
+                            delete schedule[key];
+                        }
+                        if (!schedule[key]) schedule[key] = [];
+                        schedule[key].push(reqId);
+                    });
+                });
+                newCourses.push({
+                    id: reqId,
+                    name: req.name + "(校)",
+                    teacher: "校必修", 
+                    periods: req.days.length * req.periods.length,
+                    isSplit: false,
+                    allowedGrades: [req.grade], 
+                    courseType: 'required',
+                    isIndependent: true, 
+                    isDeptReq: true, 
+                    isLocked: true,
+                    semester: reqSem
+                });
+            });
+            courses = [...courses, ...newCourses];
+            let msg = '電機系校必修已載入';
+            if(conflictCount > 0) msg += `，並移除了 ${conflictCount} 個衝突時段的課程回到列表`;
+            Swal.fire('已載入', msg, 'success');
         }
+        save(); render();
     }
 
-    function updateCard(id, current, target, count, totalCount) {
-        const credEl = document.getElementById(`${id}Cred`); if(credEl) credEl.innerText = current;
-        const countEl = document.getElementById(`${id}Count`); if(countEl) countEl.innerText = count;
-        const totalEl = document.getElementById(`${id}TotalCount`); if(totalEl) totalEl.innerText = totalCount;
-        const statEl = document.getElementById(`${id}Status`);
-        if (statEl && id !== 'basic' && id !== 'genEd') {
-            statEl.className = `dash-status ${current >= target ? 'status-ok' : 'status-ng'}`;
-            statEl.innerText = current >= target ? "已完成" : "未完成";
-        }
-    }
-
-    function scrollToId(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
-
-    function renderTables(lists, reqCheckList) {
-        const container = document.getElementById('tables-container');
-        const backLink = `<div class="back-to-top" onclick="scrollToId('dashboard-anchor')">↑ 回到儀表板</div>`;
-        let html = "";
-
-        html += `<h3 id="tbl-basic" class="category-header">1. 基礎課程</h3>` + renderSimpleTable(lists.basic) + backLink;
-
-        html += `<h3 id="tbl-req" class="category-header">2. 學系必修科目</h3>`;
-        html += `<table><thead><tr><th width="35%">必修科目名稱</th><th width="10%">學分</th><th width="15%">狀態</th><th width="40%">修課紀錄</th></tr></thead><tbody>`;
-        reqCheckList.forEach(r => {
-            const status = r.matched ? '<span class="pass">✔ 通過</span>' : '<span class="fail">✘ 未修</span>';
-            const credit = r.matched && r.log ? r.log.credit : 0;
-            const detail = r.log ? `${r.log.name} (${r.log.gpa})` : "-";
-            html += `<tr><td style="padding-left:20px; font-weight:500;">${r.name}</td><td>${credit}</td><td>${status}</td><td>${detail}</td></tr>`;
+    function clearScheduleOnly() {
+        if(isReadOnly) return;
+        Swal.fire({ title: '確定清除課表?', text: "所有課程將回到左側列表", icon: 'warning', showCancelButton: true, confirmButtonText: '清除', cancelButtonText: '取消' }).then((result) => {
+            if (result.isConfirmed) { schedule = {}; save(); render(); }
         });
-        html += `</tbody></table>` + backLink;
-
-        html += `<h3 id="tbl-genEd" class="category-header">3. 通識課程</h3>` + renderSimpleTable(lists.genEd) + backLink;
-        html += `<h3 id="tbl-deptElec" class="category-header">4. 系選修 (含實驗)</h3><div class="sub-category">▶ 系選修實驗 (實驗/實作)</div>${renderSimpleTable(lists.deptElecLab)}<br><div class="sub-category">▶ 系選修課程</div>${renderSimpleTable(lists.deptElec)}` + backLink;
-        html += `<h3 id="tbl-genElec" class="category-header">5. 一般選修 (外系選修)</h3>` + renderSimpleTable(lists.genElec) + backLink;
-
-        if (lists.fail.length > 0) html += `<h3 class="category-header" style="border-color:var(--danger-color); color:var(--danger-color);">❌ 不及格 / 未通過</h3>${renderSimpleTable(lists.fail)}` + backLink;
-
-        container.innerHTML = html;
     }
 
-    function renderSimpleTable(list) {
-        if (list.length === 0) return "<p style='color:#999; margin-left:15px;'>無資料</p>";
-        list.sort((a,b) => (a.year - b.year) || (a.sem - b.sem));
-        let h = `<table><thead><tr><th width="15%">學期</th><th width="55%">科目名稱</th><th width="15%">學分</th><th width="15%">成績</th></tr></thead><tbody>`;
-        list.forEach(c => h += `<tr><td>${c.year}-${c.sem}</td><td class="course-name" style="padding-left:20px;">${c.name}</td><td>${c.credit}</td><td>${c.gpa}</td></tr>`);
-        h += `</tbody></table>`;
-        return h;
+    function clearAllData() {
+        if(isReadOnly) return;
+        Swal.fire({ title: '確定清除所有資料?', text: "這將會刪除所有課程與設定，無法復原！", icon: 'error', showCancelButton: true, confirmButtonText: '全部刪除', cancelButtonText: '取消' }).then((result) => {
+            if (result.isConfirmed) { localStorage.clear(); location.reload(); }
+        });
     }
 
-    function reAnalyzeIfReady() { if (parsedStudentData.length > 0) analyze(); }
-    function toggleAdmin() { if (prompt("請輸入管理者密碼：") === "07160330") document.getElementById('admin-panel').style.display = 'block'; else alert("密碼錯誤"); }
-    function addException() {
-        const name = document.getElementById('exName').value.trim();
-        const type = document.getElementById('exType').value;
-        const labels = { "Required": "系必修", "Basic": "基礎", "DeptElective": "系選修", "DeptElectiveLab": "系選修實驗", "GeneralElective": "一般選修", "GenEd": "通識" };
-        if (!name) return alert("請輸入課名");
-        const norm = normalizeName(name);
-        exceptionMap[norm] = type;
-        const list = document.getElementById('exceptionList');
-        if (list.querySelector('li')?.innerText === "(無)") list.innerHTML = "";
-        const li = document.createElement('li');
-        li.innerHTML = `<strong>${name}</strong> ➜ ${labels[type]} <button onclick="removeEx(this, '${norm}')" style="margin-left:10px; color:red; border:none; background:none; cursor:pointer;">[刪除]</button>`;
-        list.appendChild(li);
-        document.getElementById('exName').value = "";
-        reAnalyzeIfReady();
+    function calculateColumnLayout(day, grade) {
+        let events = [];
+        let colKeyPrefix = `${day}-${grade}-`;
+        let rawSlots = {}; 
+        
+        let currSem = parseInt(settings.currentSemester);
+
+        PERIODS.forEach((p, idx) => {
+            let key = colKeyPrefix + p.id;
+            if(schedule[key] && schedule[key].length > 0) {
+                let validIds = schedule[key].filter(cId => {
+                    let c = courses.find(x => x.id === cId);
+                    if (!c) return false;
+                    let cSem = c.semester || 3;
+                    return (cSem == 3 || cSem == currSem);
+                });
+                
+                if (validIds.length > 0) rawSlots[idx] = validIds;
+            }
+        });
+
+        let processedCourseIds = new Set();
+        Object.values(rawSlots).flat().forEach(cId => {
+            if(processedCourseIds.has(cId)) return;
+            let indices = [];
+            for(let idx in rawSlots) { if(rawSlots[idx].includes(cId)) indices.push(parseInt(idx)); }
+            indices.sort((a,b)=>a-b);
+            if(indices.length > 0) {
+                let start = indices[0]; let prev = start;
+                for(let i=1; i<indices.length; i++) {
+                    if(indices[i] !== prev + 1) { events.push({ cId: cId, start: start, end: prev }); start = indices[i]; }
+                    prev = indices[i];
+                }
+                events.push({ cId: cId, start: start, end: prev });
+            }
+            processedCourseIds.add(cId);
+        });
+        events.sort((a,b) => (a.start - b.start) || ((b.end - b.start) - (a.end - a.start)));
+        let tracks = []; 
+        events.forEach(ev => {
+            let placed = false;
+            for(let i=0; i<tracks.length; i++) {
+                if(tracks[i] < ev.start) { ev.track = i; tracks[i] = ev.end; placed = true; break; }
+            }
+            if(!placed) { ev.track = tracks.length; tracks.push(ev.end); }
+        });
+        return { events, maxTracks: Math.max(1, tracks.length) };
     }
-    function removeEx(btn, key) { delete exceptionMap[key]; btn.parentElement.remove(); reAnalyzeIfReady(); }
+
+    function render() { 
+        let teacherCounts = {};
+        courses.forEach(c => {
+            let t = c.teacher;
+            if(!teacherCounts[t]) teacherCounts[t] = 0;
+            teacherCounts[t]++;
+        });
+        courses.sort((a, b) => {
+            if (a.isDeptReq && !b.isDeptReq) return -1;
+            if (!a.isDeptReq && b.isDeptReq) return 1;
+            let countDiff = teacherCounts[b.teacher] - teacherCounts[a.teacher];
+            if (countDiff !== 0) return countDiff;
+            let teacherDiff = a.teacher.localeCompare(b.teacher);
+            if (teacherDiff !== 0) return teacherDiff;
+            return a.name.localeCompare(b.name);
+        });
+        
+        const semLabel = document.getElementById('currentSemLabel');
+        const yearLabel = document.getElementById('currentYearLabel');
+        
+        yearLabel.innerText = `${currentYear}學年`;
+        
+        if (settings.currentSemester == 1) semLabel.innerText = "上學期";
+        else if (settings.currentSemester == 2) semLabel.innerText = "下學期";
+        else semLabel.innerText = "";
+
+        renderSidebar(); 
+        renderTimetable(); 
+        renderLegend(); 
+    }
+
+    function renderSidebar() {
+        const list = document.getElementById('courseList');
+        list.innerHTML = '';
+        
+        let coursesByTeacher = {};
+        let teacherOrder = [];
+
+        let currSem = parseInt(settings.currentSemester);
+
+        let visibleCourses = courses.filter(c => {
+            let cSem = c.semester || 3;
+            return (cSem == 3 || cSem == currSem);
+        });
+
+        visibleCourses.forEach(c => {
+            if (!coursesByTeacher[c.teacher]) {
+                coursesByTeacher[c.teacher] = [];
+                teacherOrder.push(c.teacher);
+            }
+            coursesByTeacher[c.teacher].push(c);
+        });
+
+        let processedParents = new Set();
+
+        teacherOrder.forEach(teacher => {
+            let teacherCourses = coursesByTeacher[teacher];
+            let isCollapsed = collapsedTeachers.includes(teacher);
+            let arrowIcon = isCollapsed ? 'fa-angle-right' : 'fa-angle-down';
+            let tColor = teacherColors[teacher] || '#ccc';
+            if(teacher === "校必修") tColor = 'red';
+            
+            let uniqueCourses = new Set();
+            teacherCourses.forEach(c => {
+                if(c.parentId) uniqueCourses.add(c.parentId);
+                else uniqueCourses.add(c.id);
+            });
+            let uniqueCount = uniqueCourses.size;
+
+            let groupDiv = document.createElement('div');
+            groupDiv.className = 'teacher-group';
+            
+            let headerDiv = document.createElement('div');
+            headerDiv.className = 'teacher-header';
+            headerDiv.style.borderLeftColor = tColor; 
+            headerDiv.innerHTML = `<span><span class="icon"><i class="fas ${arrowIcon}"></i></span> ${teacher}</span> <span class="tag is-light is-rounded">${uniqueCount}</span>`;
+            headerDiv.onclick = () => toggleTeacherCollapse(teacher);
+            groupDiv.appendChild(headerDiv);
+
+            let contentDiv = document.createElement('div');
+            contentDiv.className = `teacher-content ${isCollapsed ? 'is-collapsed' : ''}`;
+
+            teacherCourses.forEach(c => {
+                let cardHtml = createCourseCard(c, processedParents);
+                if (cardHtml) contentDiv.appendChild(cardHtml);
+            });
+
+            groupDiv.appendChild(contentDiv);
+            list.appendChild(groupDiv);
+        });
+    }
+
+    function toggleTeacherCollapse(teacher) {
+        if (collapsedTeachers.includes(teacher)) {
+            collapsedTeachers = collapsedTeachers.filter(t => t !== teacher);
+        } else {
+            collapsedTeachers.push(teacher);
+        }
+        localStorage.setItem('collapsedTeachers', JSON.stringify(collapsedTeachers));
+        renderSidebar();
+    }
+
+    function getSemTag(sem) {
+        if (sem == 1) return `<span class="sem-tag sem-1">上</span>`;
+        if (sem == 2) return `<span class="sem-tag sem-2">下</span>`;
+        return `<span class="sem-tag sem-3">全</span>`; // Default
+    }
+
+    function createCourseCard(c, processedParents) {
+        let borderColor = c.isDeptReq ? '#ff0000' : (teacherColors[c.teacher] || '#ccc');
+        let isLockedClass = c.isLocked ? 'is-locked' : '';
+        let semTag = getSemTag(c.semester || 3);
+
+        if(c.parentId) {
+            if(processedParents.has(c.parentId)) return null;
+            processedParents.add(c.parentId);
+            
+            let siblings = courses.filter(x => x.parentId === c.parentId).sort((a,b) => a.periods - b.periods);
+            let baseName = siblings[0].name.replace(/\(\d+\)$/, '').replace(/\(必\)$/, '').replace(/\(選\)$/, '').replace(/\(校\)$/, '');
+            
+            let typeSuffix = "";
+            if (siblings[0].courseType === 'required') typeSuffix = " (必)";
+            else if (siblings[0].courseType === 'elective') typeSuffix = " (選)";
+            
+            const div = document.createElement('div');
+            div.className = `course-card ${isLockedClass}`; 
+            div.style.borderLeftColor = borderColor;
+
+            let allFull = siblings.every(part => getScheduledCount(part.id) >= part.periods);
+            if (allFull) div.classList.add('is-fully-scheduled');
+
+            let partsHtml = '';
+            siblings.forEach((part, index) => {
+                let used = getScheduledCount(part.id);
+                let isFull = used >= part.periods;
+                let draggableAttr = (isReadOnly || isFull || part.isLocked) ? '' : 'draggable="true"';
+                let disabledClass = (isReadOnly || isFull) ? 'disabled' : '';
+                
+                partsHtml += `
+                    <div class="split-part ${disabledClass}" 
+                        ${draggableAttr}
+                        ondragstart="handleSidebarDragStart(event, '${part.id}', ${part.periods})">
+                        第${index+1}段 (${part.periods}節)
+                    </div>`;
+            });
+
+            div.innerHTML = `
+                ${semTag}
+                <div class="card-header"><span class="card-title" style="padding-right:15px;">${baseName}${typeSuffix}</span><span class="tag-split">已拆分</span></div>
+                <div style="font-size:10px;color:#666;margin-bottom:2px;">${siblings[0].teacher}</div>
+                ${siblings[0].isIndependent ? '<div style="font-size:10px;color:red;font-weight:bold;">★ 獨立必修</div>' : ''}
+                <div class="split-parts-container">${partsHtml}</div>
+
+                <div class="btn-actions edit-only" ${c.isLocked ? 'style="display:none"' : ''}>
+                    <button class="has-background-info-dark" onclick="openEditModal('${siblings[0].id}')">編輯</button>
+                    <button class="has-background-success-dark" onclick="mergeCourse('${siblings[0].id}')">合併</button>
+                    <button class="has-background-danger-dark" onclick="deleteCourse('${siblings[0].id}')">刪除</button>
+                </div>
+            `;
+            return div;
+
+        } else {
+            const used = getScheduledCount(c.id);
+            const total = c.periods;
+            const isFull = used >= total;
+            
+            const div = document.createElement('div');
+            div.className = `course-card draggable-card ${isFull ? 'disabled' : ''} ${isLockedClass}`;
+            if (isFull) div.classList.add('is-fully-scheduled'); 
+
+            div.style.borderLeftColor = borderColor;
+            
+            // Disable drag in read only
+            div.draggable = !isReadOnly && !isFull && !c.isLocked;
+            
+            div.ondragstart = (e) => handleSidebarDragStart(e, c.id, total);
+
+            let splitBtn = ((total === 3 || total === 4) || total === 2) ? `<button class="has-background-warning-dark" onclick="splitCourse('${c.id}')">拆分</button>` : '';
+
+            div.innerHTML = `
+                ${semTag}
+                <div class="card-header"><span class="card-title" style="padding-right:15px;">${c.name}</span></div>
+                <div style="font-size:10px;color:#666;margin-bottom:2px;">${c.teacher} • ${total}節 (已排${used})</div>
+                ${c.isIndependent ? '<div style="font-size:10px;color:red;font-weight:bold;">★ 獨立必修</div>' : ''}
+                <div class="btn-actions edit-only" ${c.isLocked ? 'style="display:none"' : ''}>
+                    <button class="has-background-info-dark" onclick="openEditModal('${c.id}')">編輯</button>
+                    ${splitBtn} 
+                    <button class="has-background-danger-dark" onclick="deleteCourse('${c.id}')">刪除</button>
+                </div>
+            `;
+            return div;
+        }
+    }
+
+    function handleSidebarDragStart(e, cId, duration) {
+        if(isReadOnly || e.target.classList.contains('disabled')) {
+            e.preventDefault();
+            return;
+        }
+        setTimeout(() => document.body.classList.add('is-dragging'), 0);
+        e.dataTransfer.setData('cId', cId);
+        e.dataTransfer.setData('src', 'sidebar');
+        e.dataTransfer.setData('dur', duration);
+
+        let course = courses.find(c => c.id === cId);
+        if(course) {
+            highlightZones(course); 
+        }
+    }
+    
+    function highlightZones(course) {
+        if(isReadOnly) return;
+        let grades = course.allowedGrades || [];
+        let teacher = course.teacher;
+        let avail = teacherAvailability[teacher] || [];
+
+        if (grades.length > 0) {
+            grades.forEach(g => {
+                document.querySelectorAll(`td[data-grade="${g}"]`).forEach(td => td.classList.add('grade-highlight'));
+            });
+        }
+
+        if (avail.length > 0) {
+            avail.forEach(dp => { 
+                let targets = document.querySelectorAll(`td[data-dp="${dp}"]`);
+                targets.forEach(td => {
+                    let tdGrade = parseInt(td.getAttribute('data-grade'));
+                    if (grades.length === 0 || grades.includes(tdGrade)) {
+                        td.classList.add('suggestion-highlight');
+                    }
+                });
+            });
+        }
+    }
+
+    document.addEventListener('dragend', () => {
+        document.body.classList.remove('is-dragging');
+        clearHighlights();
+    });
+
+    function clearHighlights() {
+        document.querySelectorAll('.grade-highlight').forEach(el => el.classList.remove('grade-highlight'));
+        document.querySelectorAll('.suggestion-highlight').forEach(el => el.classList.remove('suggestion-highlight'));
+    }
+
+    function renderTimetable() {
+        const table = document.getElementById('mainTable');
+        const colgroup = document.getElementById('tableColGroup');
+        const thead = document.getElementById('tableHead');
+        const tbody = document.getElementById('tableBody');
+        const appContainer = document.getElementById('appContainer');
+        colgroup.innerHTML = ''; thead.innerHTML = ''; tbody.innerHTML = '';
+
+        let days = ['一','二','三','四','五','六','日'];
+        let dayCols = [];
+        for(let d=1; d<=7; d++) {
+            if(d<=5 || (d==6 && settings.sat) || (d==7 && settings.sun)) {
+                let gradesToShow = settings.wd; 
+                let currentWd = (d <= 5) ? [true,true,true,true] : settings.wd;
+
+                for(let g=1; g<=4; g++) { if(currentWd[g-1]) dayCols.push({d:d, g:g}); }
+            }
+        }
+
+        let colLayouts = dayCols.map(col => calculateColumnLayout(col.d, col.g));
+        let totalTracks = colLayouts.reduce((acc, curr) => acc + curr.maxTracks, 0);
+        
+        const IDEAL_TRACK_WIDTH = 60; 
+        const SIDEBAR_WIDTH = 220;
+        const TIME_COL_WIDTH = 30;
+        const MARGINS = 80; 
+        
+        let idealTableWidth = TIME_COL_WIDTH + (totalTracks * IDEAL_TRACK_WIDTH);
+        let maxAvailableWidth = window.innerWidth - SIDEBAR_WIDTH - MARGINS;
+        let finalTableWidth = Math.min(idealTableWidth, maxAvailableWidth);
+        
+        let newAppWidth = SIDEBAR_WIDTH + MARGINS + finalTableWidth;
+        appContainer.style.width = `${Math.max(800, newAppWidth)}px`;
+
+        let colTime = document.createElement('col');
+        colTime.style.width = `${TIME_COL_WIDTH}px`; 
+        colgroup.appendChild(colTime);
+
+        let availableForCourses = finalTableWidth - TIME_COL_WIDTH;
+        dayCols.forEach((col, idx) => {
+            let colEl = document.createElement('col');
+            let trackCount = colLayouts[idx].maxTracks;
+            let colWidth = (availableForCourses * trackCount) / totalTracks;
+            colEl.style.width = `${colWidth}px`;
+            colgroup.appendChild(colEl);
+        });
+
+        let tr1 = document.createElement('tr');
+        let tr2 = document.createElement('tr');
+        let thTime = document.createElement('th');
+        thTime.rowSpan = 2; thTime.textContent = '#'; thTime.className = 'time-col';
+        tr1.appendChild(thTime);
+
+        let currentDay = -1; let currentDaySpan = 0; let dayTh = null;
+        
+        dayCols.forEach((col, idx) => {
+            if(col.d !== currentDay) {
+                currentDay = col.d; 
+                dayTh = document.createElement('th'); 
+                dayTh.textContent = `週${days[col.d-1]}`;
+                dayTh.classList.add('day-border-left');
+                if(col.d >= 6) dayTh.style.color = '#e67e22';
+                tr1.appendChild(dayTh); currentDaySpan = 1;
+            } else { currentDaySpan++; }
+            if(dayTh) dayTh.colSpan = currentDaySpan;
+            
+            let thG = document.createElement('th'); 
+            thG.textContent = `大${['一','二','三','四'][col.g-1]}`;
+            if (currentDaySpan === 1) {
+                thG.classList.add('day-border-left');
+            }
+            if(col.d >= 6) thG.classList.add('weekend-bg');
+            if(col.g === 4) thG.textContent = "大四/碩士"; 
+            tr2.appendChild(thG);
+        });
+        thead.appendChild(tr1); thead.appendChild(tr2);
+
+        PERIODS.forEach((p, pIdx) => {
+            let tr = document.createElement('tr');
+            let tdTime = document.createElement('td');
+            tdTime.className = 'time-col';
+            tdTime.innerHTML = `<div style="line-height:1">${p.id}</div>`;
+            tr.appendChild(tdTime);
+            
+            let currentDayForTd = -1;
+
+            dayCols.forEach((col, colIdx) => {
+                let td = document.createElement('td');
+                let slotId = `${col.d}-${col.g}-${p.id}`;
+                
+                if (col.d !== currentDayForTd) {
+                    td.classList.add('day-border-left');
+                    currentDayForTd = col.d;
+                }
+
+                td.setAttribute('data-dp', `${col.d}-${p.id}`);
+                td.setAttribute('data-grade', col.g);
+
+                if(col.d >= 6) td.classList.add('weekend-bg');
+                let layout = colLayouts[colIdx];
+                td.ondragover = (e) => { 
+                    e.preventDefault(); 
+                    if(!isReadOnly) td.classList.add('drop-highlight'); 
+                };
+                td.ondragleave = (e) => td.classList.remove('drop-highlight');
+                td.ondrop = (e) => handleDrop(e, slotId);
+                let startingEvents = layout.events.filter(ev => ev.start === pIdx);
+                startingEvents.forEach(ev => {
+                    let course = courses.find(c => c.id === ev.cId);
+                    if(course) {
+                        let div = document.createElement('div');
+                        
+                        if (course.isDeptReq) {
+                            div.className = 'course-block is-locked';
+                            div.style.backgroundColor = 'white';
+                            div.style.color = 'red';
+                            div.style.border = '1px solid red';
+                        } else {
+                            div.className = 'course-block';
+                            div.style.backgroundColor = teacherColors[course.teacher];
+                            div.style.color = teacherTextColors[course.teacher] || 'black';
+                        }
+
+                        let duration = ev.end - ev.start + 1;
+                        div.style.height = `calc(${duration * 100}% + ${(duration-1)}px - 1px)`; 
+                        div.style.top = '1px';
+                        let widthPct = 100 / layout.maxTracks;
+                        let leftPct = ev.track * widthPct;
+                        div.style.width = `calc(${widthPct}% - 2px)`;
+                        div.style.left = `calc(${leftPct}% + 1px)`;
+                        
+                        let dispName = course.name.replace(/\(\d+\)$/, '');
+                        div.innerHTML = `<div>${dispName}</div>${layout.maxTracks < 3 ? `<div class="course-info">${course.teacher}</div>` : ''}<div class="del-btn edit-only" onclick="clearCourse('${course.id}')">×</div>`;
+                        
+                        // Disable dragging in read only mode
+                        div.draggable = !isReadOnly && !course.isLocked;
+                        
+                        if(div.draggable) {
+                            div.ondragstart = (e) => {
+                                e.stopPropagation(); 
+                                setTimeout(() => document.body.classList.add('is-dragging'), 0);
+                                e.dataTransfer.setData('cId', course.id); 
+                                e.dataTransfer.setData('src', 'timetable'); 
+                                e.dataTransfer.setData('oldSlotId', slotId); 
+                                e.dataTransfer.setData('dur', duration);
+                                highlightZones(course);
+                            };
+                            div.ondragend = () => {
+                                document.body.classList.remove('is-dragging');
+                                clearHighlights();
+                            };
+                        }
+                        td.appendChild(div);
+                    }
+                });
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderLegend() {
+        const el = document.getElementById('teacherLegend'); el.innerHTML = '';
+        Object.keys(teacherColors).forEach(t => { 
+            el.innerHTML += `<div class="tag is-light legend-item" onclick="openTeacherSettings('${t}')" style="background:${teacherColors[t]}55;border:1px solid ${teacherColors[t]}; font-size: 10px; padding: 0 5px; height: 1.5em;"><span style="width:5px;height:5px;background:${teacherColors[t]};border-radius:50%;margin-right:3px;"></span>${t}</div>`; 
+        });
+    }
+
+    function openTeacherSettings(teacherName) {
+        if(isReadOnly) return; // Prevent editing teacher settings in read only
+        let currentColor = teacherColors[teacherName];
+        let currentTextColor = teacherTextColors[teacherName] || 'black';
+        let currentAvail = teacherAvailability[teacherName] || [];
+
+        let tableHtml = '<div style="max-height:300px; overflow:auto;"><table class="avail-table"><thead><tr><th></th>';
+        const dayMap = { '1':'一', '2':'二', '3':'三', '4':'四', '5':'五', '6':'六', '7':'日' };
+        for(let d=1; d<=7; d++) tableHtml += `<th>${dayMap[d]}</th>`;
+        tableHtml += '</tr></thead><tbody>';
+
+        PERIODS.forEach(p => {
+            tableHtml += `<tr><td>${p.id}</td>`;
+            for(let d=1; d<=7; d++) {
+                let dp = `${d}-${p.id}`;
+                let checked = currentAvail.includes(dp) ? 'checked' : '';
+                tableHtml += `<td><input type="checkbox" class="avail-checkbox" value="${dp}" ${checked}></td>`;
+            }
+            tableHtml += '</tr>';
+        });
+        tableHtml += '</tbody></table></div>';
+
+        Swal.fire({
+            title: `設定 ${teacherName}`,
+            html: `
+                <div style="text-align:left; margin-bottom:10px;">
+                    <label class="label is-small">代表顏色 (背景)</label>
+                    <input type="color" id="swalColor" value="${currentColor}" style="width:100%; height:40px;">
+                </div>
+                <div style="text-align:left; margin-bottom:10px;">
+                    <label class="label is-small">文字顏色</label>
+                    <div class="select is-fullwidth is-small">
+                        <select id="swalTextColor">
+                            <option value="black" ${currentTextColor==='black'?'selected':''}>黑色</option>
+                            <option value="white" ${currentTextColor==='white'?'selected':''}>白色</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="text-align:left;">
+                    <label class="label is-small">可排課時段 (綠光顯示)</label>
+                    ${tableHtml}
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: '儲存',
+            width: '600px',
+            preConfirm: () => {
+                let newColor = document.getElementById('swalColor').value;
+                let newTextColor = document.getElementById('swalTextColor').value;
+                let checkedBoxes = document.querySelectorAll('.avail-checkbox:checked');
+                let newAvail = Array.from(checkedBoxes).map(cb => cb.value);
+                return { newColor, newTextColor, newAvail };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                teacherColors[teacherName] = result.value.newColor;
+                teacherTextColors[teacherName] = result.value.newTextColor;
+                teacherAvailability[teacherName] = result.value.newAvail;
+                save();
+                render();
+            }
+        });
+    }
+
+    function handleDrop(e, targetSlotId) {
+        e.preventDefault(); 
+        if(isReadOnly) return;
+
+        document.body.classList.remove('is-dragging');
+        clearHighlights();
+        document.querySelectorAll('.drop-highlight').forEach(x => x.classList.remove('drop-highlight'));
+        
+        const cId = e.dataTransfer.getData('cId'); const src = e.dataTransfer.getData('src');
+        const duration = parseInt(e.dataTransfer.getData('dur')) || 1; const oldSlotId = e.dataTransfer.getData('oldSlotId');
+        const course = courses.find(c => c.id === cId); if(!course) return;
+        
+        const [d, g, pStart] = targetSlotId.split('-'); const pIdx = PERIODS.findIndex(p => p.id === pStart);
+        
+        let targetGrade = parseInt(g);
+        if (course.allowedGrades && course.allowedGrades.length > 0) {
+            if (!course.allowedGrades.includes(targetGrade)) {
+                Swal.fire('限制警告', '該課程有限制年級，無法放置於此年級。', 'error');
+                return;
+            }
+        }
+
+        let targetSlots = []; for(let i=0; i<duration; i++) if(pIdx + i < PERIODS.length) targetSlots.push(`${d}-${g}-${PERIODS[pIdx+i].id}`);
+        let oldSlots = []; if(src === 'timetable' && oldSlotId) {
+            const [od, og, opStart] = oldSlotId.split('-'); const opIdx = PERIODS.findIndex(p => p.id === opStart);
+            for(let i=0; i<duration; i++) if(opIdx + i < PERIODS.length) oldSlots.push(`${od}-${og}-${PERIODS[opIdx+i].id}`);
+        }
+        
+        for(let tSlot of targetSlots) {
+            let [td, tg, tp] = tSlot.split('-'); 
+
+            let existing = schedule[tSlot] || [];
+            for(let exId of existing) {
+                if(exId === cId && oldSlots.includes(tSlot)) continue; 
+                let exCourse = courses.find(c => c.id === exId); if(!exCourse) continue;
+                
+                // --- 衝突檢查邏輯更新 ---
+                // 1. 同一門課的拆分不可重疊 (永遠檢查)
+                if(course.parentId && exCourse.parentId === course.parentId) { Swal.fire('重疊錯誤', '同一門課的拆分時段不可重疊', 'error'); return; }
+
+                // 2. 檢查學期是否衝突
+                let mySem = course.semester || 3;
+                let exSem = exCourse.semester || 3;
+                let isSemConflict = (mySem == 3 || exSem == 3 || mySem == exSem);
+
+                if (isSemConflict) {
+                     // 3. 教師衝堂
+                    if(exCourse.teacher === course.teacher && exCourse.teacher !== "校必修") { Swal.fire('教師衝堂', `教師 ${course.teacher} 在此時段已有 ${exCourse.name}`, 'error'); return; }
+                }
+            }
+
+            // 4. 必修衝突檢查
+            let conflictFound = false;
+            let conflictName = "";
+
+            let checkKey = `${td}-${tg}-${tp}`; 
+            let checkList = schedule[checkKey] || [];
+            
+            for(let checkId of checkList) {
+                if (checkId === cId && oldSlots.includes(checkKey)) continue; 
+                let checkCourse = courses.find(c => c.id === checkId);
+                if (!checkCourse) continue;
+
+                // 學期是否重疊
+                let mySem = course.semester || 3;
+                let chkSem = checkCourse.semester || 3;
+                if (mySem != 3 && chkSem != 3 && mySem != chkSem) continue; // 1vs2 不衝突
+
+                if (course.isIndependent) {
+                    conflictFound = true;
+                    conflictName = checkCourse.name;
+                }
+                else if (checkCourse.isIndependent) {
+                    conflictFound = true;
+                    conflictName = checkCourse.name + "(必修)";
+                }
+
+                if (conflictFound) break;
+            }
+
+            if (conflictFound) {
+                Swal.fire('必修衝突', `同年級時段已有課程「${conflictName}」，獨立必修/校必修課程不可與同年級課程衝堂。`, 'error');
+                return;
+            }
+        }
+
+        if(src === 'timetable') oldSlots.forEach(s => removeFromSchedule(s, cId));
+        targetSlots.forEach(s => addToSchedule(s, cId)); 
+        save(); 
+        render();
+    }
+
+    function addToSchedule(slot, cId) { if(!schedule[slot]) schedule[slot] = []; if(!schedule[slot].includes(cId)) schedule[slot].push(cId); }
+    function removeFromSchedule(slot, cId) { if(schedule[slot]) { schedule[slot] = schedule[slot].filter(x => x !== cId); if(schedule[slot].length === 0) delete schedule[slot]; } }
+    function getScheduledCount(cId) { let cnt = 0; Object.values(schedule).forEach(l => { if(l.includes(cId)) cnt++; }); return cnt; }
+    function clearCourse(cId) { if(isReadOnly) return; Object.keys(schedule).forEach(k => removeFromSchedule(k, cId)); save(); render(); }
+    
+    function deleteCourse(cId) {
+        if(isReadOnly) return;
+        Swal.fire({ title: '確定刪除?', icon: 'warning', showCancelButton: true, confirmButtonText: '刪除', cancelButtonText: '取消' }).then((result) => {
+            if (result.isConfirmed) {
+                let course = courses.find(c => c.id === cId); 
+                let idsToDelete = [cId];
+                let targetTeacher = course ? course.teacher : null;
+
+                if(course && course.parentId) {
+                     courses.forEach(c => { if(c.parentId === course.parentId) idsToDelete.push(c.id); });
+                } 
+                else if(course && !course.parentId) {
+                    courses.forEach(c => { if(c.parentId === cId) idsToDelete.push(c.id); });
+                }
+
+                idsToDelete = [...new Set(idsToDelete)];
+                idsToDelete.forEach(id => clearCourse(id));
+                courses = courses.filter(c => !idsToDelete.includes(c.id));
+
+                if(targetTeacher && targetTeacher !== "校必修") {
+                    let teacherStillExists = courses.some(c => c.teacher === targetTeacher);
+                    if(!teacherStillExists) {
+                        delete teacherColors[targetTeacher];
+                        delete teacherTextColors[targetTeacher];
+                        delete teacherAvailability[targetTeacher];
+                    }
+                }
+
+                save(); render();
+            }
+        });
+    }
+
+    function splitCourse(cId) {
+        if(isReadOnly) return;
+        let original = courses.find(x => x.id === cId);
+        if(!original) return;
+
+        let allowed = original.allowedGrades ? [...original.allowedGrades] : [];
+        let cType = original.courseType || 'none';
+        let isInd = original.isIndependent || false;
+        let cSem = original.semester || 3; 
+
+        let partNameBase = original.name.replace(/\(必\)$/, '').replace(/\(選\)$/, '');
+
+        if (original.periods === 3) {
+            clearCourse(cId); let baseId = Date.now();
+            let partA = { ...original, id: (baseId).toString(), periods: 1, isSplit: true, parentId: cId, name: partNameBase + "(1)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            let partB = { ...original, id: (baseId+1).toString(), periods: 2, isSplit: true, parentId: cId, name: partNameBase + "(2)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            courses = courses.filter(c => c.id !== cId); courses.push(partA, partB); save(); render();
+        } else if (original.periods === 4) {
+            clearCourse(cId); let baseId = Date.now();
+            let partA = { ...original, id: (baseId).toString(), periods: 2, isSplit: true, parentId: cId, name: partNameBase + "(1)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            let partB = { ...original, id: (baseId+1).toString(), periods: 2, isSplit: true, parentId: cId, name: partNameBase + "(2)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            courses = courses.filter(c => c.id !== cId); courses.push(partA, partB); save(); render();
+        } 
+        else if (original.periods === 2) {
+            clearCourse(cId); let baseId = Date.now();
+            let partA = { ...original, id: (baseId).toString(), periods: 1, isSplit: true, parentId: cId, name: partNameBase + "(1)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            let partB = { ...original, id: (baseId+1).toString(), periods: 1, isSplit: true, parentId: cId, name: partNameBase + "(2)", allowedGrades: allowed, courseType: cType, isIndependent: isInd, semester: cSem };
+            courses = courses.filter(c => c.id !== cId); courses.push(partA, partB); save(); render();
+        }
+        else {
+            Swal.fire('限制', '目前支援拆分：2學分(1+1)、3學分(1+2)、4學分(2+2)', 'info');
+        }
+    }
+    
+    function mergeCourse(cId) {
+        if(isReadOnly) return;
+        let part = courses.find(c => c.id === cId); if(!part || !part.parentId) return;
+        let parentId = part.parentId; let siblings = courses.filter(c => c.parentId === parentId);
+        siblings.forEach(s => clearCourse(s.id)); let template = siblings[0];
+        let totalPeriods = siblings.reduce((sum, s) => sum + s.periods, 0);
+        let allowed = template.allowedGrades ? [...template.allowedGrades] : [];
+        let cSem = template.semester || 3;
+        
+        let cleanName = template.name.replace(/\(\d+\)$/, '').replace(/\(必\)$/, '').replace(/\(選\)$/, '');
+
+        let original = { id: parentId, name: cleanName, teacher: template.teacher, periods: totalPeriods, isSplit: false, allowedGrades: allowed, courseType: template.courseType, isIndependent: template.isIndependent, semester: cSem };
+        courses = courses.filter(c => c.parentId !== parentId); courses.push(original); save(); render();
+    }
+
+    function addCourse() {
+        if(isReadOnly) return;
+        let name = document.getElementById('mName').value;
+        let teacher = document.getElementById('mTeacher').value; let credits = parseInt(document.getElementById('mCredits').value);
+        let checkedGrades = Array.from(document.querySelectorAll('#mGradeContainer input:checked')).map(cb => parseInt(cb.value));
+        
+        let mType = document.querySelector('input[name="mType"]:checked').value; 
+        let mIndependent = (mType === 'required') ? document.getElementById('mIndependent').checked : false;
+        
+        let mSem = parseInt(document.querySelector('input[name="mSem"]:checked').value);
+
+        let finalName = name;
+        if (mType === 'required') finalName += " (必)";
+        else if (mType === 'elective') finalName += " (選)";
+
+        if(name && teacher && credits) {
+            courses.push({ 
+                id: Date.now().toString(), 
+                name: finalName, teacher, periods: credits, isSplit: false, 
+                allowedGrades: checkedGrades,
+                courseType: mType,
+                isIndependent: mIndependent,
+                semester: mSem
+            });
+            if(!teacherColors[teacher]) teacherColors[teacher] = SOFT_COLORS[Object.keys(teacherColors).length % SOFT_COLORS.length];
+            save(); render(); closeModal(); 
+            document.getElementById('mName').value = ''; 
+            document.querySelectorAll('#mGradeContainer input').forEach(cb => cb.checked = false);
+            document.querySelector('input[name="mType"][value="none"]').checked = true;
+            document.querySelector('input[name="mSem"][value="3"]').checked = true; 
+            toggleMIndependent(false);
+        } else { Swal.fire('欄位不完整', '請填寫所有欄位', 'warning'); }
+    }
+
+    function openEditModal(cId) {
+        if(isReadOnly) return;
+        let course = courses.find(c => c.id === cId);
+        if(!course) return;
+        
+        document.getElementById('eId').value = course.id;
+        
+        let displayName = course.name;
+        if(course.parentId) displayName = displayName.replace(/\(\d+\)$/, '');
+        displayName = displayName.replace(/\(必\)$/, '').replace(/\(選\)$/, '');
+        
+        document.getElementById('eName').value = displayName;
+        document.getElementById('eTeacher').value = course.teacher;
+        
+        let creditInput = document.getElementById('eCredits');
+        creditInput.value = course.periods;
+        
+        let allowed = course.allowedGrades || [];
+        document.querySelectorAll('#eGradeContainer input').forEach(cb => {
+            cb.checked = allowed.includes(parseInt(cb.value));
+        });
+
+        let cType = course.courseType || 'none';
+        let radio = document.querySelector(`input[name="eType"][value="${cType}"]`);
+        if(radio) radio.checked = true;
+        toggleEIndependent(cType === 'required');
+        
+        if (cType === 'required') {
+            document.getElementById('eIndependent').checked = !!course.isIndependent;
+        }
+
+        let cSem = course.semester || 3;
+        let semRadio = document.querySelector(`input[name="eSem"][value="${cSem}"]`);
+        if(semRadio) semRadio.checked = true;
+
+        if(course.parentId) {
+            creditInput.disabled = true;
+            document.getElementById('eCreditsHelp').innerText = "已拆分課程不可修改節數，請先合併後再修改。";
+        } else {
+            creditInput.disabled = false;
+            document.getElementById('eCreditsHelp').innerText = "注意：修改節數將會清除該課程目前的排課時間。";
+        }
+        
+        document.getElementById('editCourseModal').classList.add('is-active');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editCourseModal').classList.remove('is-active');
+    }
+
+    function submitEdit() {
+        if(isReadOnly) return;
+        let cId = document.getElementById('eId').value;
+        let name = document.getElementById('eName').value;
+        let teacher = document.getElementById('eTeacher').value;
+        let credits = parseInt(document.getElementById('eCredits').value);
+        let checkedGrades = Array.from(document.querySelectorAll('#eGradeContainer input:checked')).map(cb => parseInt(cb.value));
+        
+        let eType = document.querySelector('input[name="eType"]:checked').value;
+        let eIndependent = (eType === 'required') ? document.getElementById('eIndependent').checked : false;
+
+        let eSem = parseInt(document.querySelector('input[name="eSem"]:checked').value);
+
+        let finalName = name;
+        if (eType === 'required') finalName += " (必)";
+        else if (eType === 'elective') finalName += " (選)";
+        
+        let courseIndex = courses.findIndex(c => c.id === cId);
+        if(courseIndex === -1) return;
+
+        let originalCourse = courses[courseIndex];
+
+        if(name && teacher && credits) {
+            if (originalCourse.parentId) {
+                courses.forEach(c => {
+                    if (c.parentId === originalCourse.parentId) {
+                        let suffix = c.name.match(/\(\d+\)$/); 
+                        c.name = finalName + (suffix ? suffix[0] : "");
+                        c.teacher = teacher;
+                        c.allowedGrades = checkedGrades;
+                        c.courseType = eType;
+                        c.isIndependent = eIndependent;
+                        c.semester = eSem; 
+                    }
+                });
+                handleTeacherColorUpdate(originalCourse.teacher, teacher);
+            } else {
+                if(originalCourse.periods !== credits) {
+                     clearCourse(cId);
+                }
+                handleTeacherColorUpdate(originalCourse.teacher, teacher);
+                courses[courseIndex] = {
+                    ...originalCourse,
+                    name: finalName, teacher: teacher, periods: credits, 
+                    allowedGrades: checkedGrades,
+                    courseType: eType,
+                    isIndependent: eIndependent,
+                    semester: eSem 
+                };
+            }
+            save(); render(); closeEditModal();
+        } else {
+            Swal.fire('欄位不完整', '請填寫所有欄位', 'warning');
+        }
+    }
+
+    function handleTeacherColorUpdate(oldTeacher, newTeacher) {
+        if(oldTeacher !== newTeacher && oldTeacher !== "校必修") {
+            let oldTeacherStillExists = courses.some(c => c.teacher === oldTeacher);
+            if(!oldTeacherStillExists) {
+                 delete teacherColors[oldTeacher];
+                 delete teacherTextColors[oldTeacher];
+                 delete teacherAvailability[oldTeacher];
+            }
+            if(!teacherColors[newTeacher]) {
+                teacherColors[newTeacher] = SOFT_COLORS[Object.keys(teacherColors).length % SOFT_COLORS.length];
+            }
+        }
+    }
+
+    function openModal() { if(isReadOnly) return; document.getElementById('courseModal').classList.add('is-active'); }
+    function closeModal() { document.getElementById('courseModal').classList.remove('is-active'); }
+    function save() { 
+        if(isReadOnly) return;
+        localStorage.setItem(getStorageKey('courses'), JSON.stringify(courses)); 
+        localStorage.setItem(getStorageKey('schedule'), JSON.stringify(schedule)); 
+        localStorage.setItem(getStorageKey('teacherColors'), JSON.stringify(teacherColors)); 
+        localStorage.setItem(getStorageKey('teacherTextColors'), JSON.stringify(teacherTextColors)); 
+        localStorage.setItem(getStorageKey('teacherAvailability'), JSON.stringify(teacherAvailability)); 
+        
+        localStorage.setItem('settings', JSON.stringify(settings)); 
+        localStorage.setItem('collapsedTeachers', JSON.stringify(collapsedTeachers));
+    }
+    function toggleSettings() { let p = document.getElementById('settingsPanel'); p.style.display = p.style.display === 'block' ? 'none' : 'block'; }
+    function updateSettings() { 
+        settings.sat = document.getElementById('showSat').checked; 
+        settings.sun = document.getElementById('showSun').checked; 
+        settings.wd = [1,2,3,4].map(i=>document.getElementById('g'+i).checked); 
+        
+        let semRadios = document.getElementsByName('semView');
+        for(let r of semRadios) { if(r.checked) settings.currentSemester = r.value; }
+
+        if(!isReadOnly) save(); 
+        render(); 
+    }
+    
+    // 全學年備份導出
+    function exportAllData() {
+        let exportObj = {};
+        
+        // 1. 全域設定
+        exportObj['settings'] = JSON.parse(localStorage.getItem('settings'));
+        exportObj['collapsedTeachers'] = JSON.parse(localStorage.getItem('collapsedTeachers'));
+        exportObj['lastActiveYear'] = localStorage.getItem('lastActiveYear');
+
+        // 2. 搜尋所有年份的資料 (114-120 或更多)
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.startsWith('courses_') || 
+                key.startsWith('schedule_') || 
+                key.startsWith('teacherColors_') ||
+                key.startsWith('teacherTextColors_') ||
+                key.startsWith('teacherAvailability_')) {
+                
+                exportObj[key] = JSON.parse(localStorage.getItem(key));
+            }
+        }
+
+        let jsonString = JSON.stringify(exportObj, null, 2);
+        let blob = new Blob([jsonString], {type: "application/json"});
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `東海電機排課_全學年備份_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        
+        Swal.fire('導出成功', '已下載包含所有學年資料的 JSON 備份檔。', 'success');
+    }
+
+    function getAllScheduleKeys(courseIds) {
+        let allKeys = [];
+        for (let key in schedule) {
+            if (schedule[key].some(id => courseIds.includes(id))) {
+                allKeys.push(key);
+            }
+        }
+        if (allKeys.length === 0) return "";
+        
+        let grouped = {};
+        allKeys.forEach(key => {
+            let [d, g, p] = key.split('-');
+            let groupKey = `${g}-${d}`;
+            if(!grouped[groupKey]) grouped[groupKey] = [];
+            grouped[groupKey].push(p);
+        });
+
+        const dayMap = { '1':'星期一', '2':'星期二', '3':'星期三', '4':'星期四', '5':'星期五', '6':'星期六', '7':'星期日' };
+        const pOrder = ['1','2','3','4','N','5','6','7','8','9'];
+
+        let parts = [];
+        for (let gk in grouped) {
+            let [g, d] = gk.split('-');
+            let periods = grouped[gk];
+            periods.sort((a,b) => pOrder.indexOf(a) - pOrder.indexOf(b));
+            parts.push(`${g} ${dayMap[d]}/${periods.join(", ")}`);
+        }
+        return parts.join("; ");
+    }
+
+    function importData(input) {
+        if(isReadOnly) return;
+        let file = input.files[0];
+        if (!file) return;
+
+        let r = new FileReader(); 
+        
+        r.onload = e => { 
+            try { 
+                let content = e.target.result;
+                
+                // 判斷是舊版 TXT 還是新版 JSON
+                if (file.name.endsWith('.json') || content.trim().startsWith('{')) {
+                    // JSON 全備份導入
+                    let data = JSON.parse(content);
+                    
+                    // 恢復全域設定
+                    if (data.settings) localStorage.setItem('settings', JSON.stringify(data.settings));
+                    if (data.collapsedTeachers) localStorage.setItem('collapsedTeachers', JSON.stringify(data.collapsedTeachers));
+                    if (data.lastActiveYear) localStorage.setItem('lastActiveYear', data.lastActiveYear);
+                    
+                    // 恢復所有學年資料
+                    for (let key in data) {
+                        if (key.startsWith('courses_') || 
+                            key.startsWith('schedule_') || 
+                            key.startsWith('teacherColors_') ||
+                            key.startsWith('teacherTextColors_') ||
+                            key.startsWith('teacherAvailability_')) {
+                            localStorage.setItem(key, JSON.stringify(data[key]));
+                        }
+                    }
+                    
+                    Swal.fire({
+                        title: '全備份導入成功',
+                        text: '所有學年的資料已恢復，頁面將重新整理。',
+                        icon: 'success',
+                        timer: 2000,
+                        showConfirmButton: false
+                    }).then(() => {
+                        location.reload();
+                    });
+
+                } else {
+                    // 舊版 TXT 單一學年導入 (維持原邏輯，但需適配當前學年)
+                    importLegacyTxt(content);
+                }
+            } catch(err) { 
+                console.error(err);
+                Swal.fire('匯入失敗', '檔案格式錯誤，請確認。', 'error'); 
+            } 
+        }; 
+        r.readAsText(file);
+    }
+
+    function importLegacyTxt(text) {
+        text = text.trim();
+        if (text.startsWith("{")) text = text.substring(1);
+        if (text.endsWith("}")) text = text.substring(0, text.length - 1);
+        
+        let lines = text.split('\n');
+        
+        let newCourses = [];
+        let newSchedule = {};
+        let newTeacherColors = {}; 
+        let newTeacherTextColors = {};
+        let newTeacherAvailability = {};
+        
+        let mode = "COURSES"; 
+
+        const dayMapRev = { '星期一':'1', '星期二':'2', '星期三':'3', '星期四':'4', '星期五':'5', '星期六':'6', '星期日':'7' };
+
+        lines.forEach(line => {
+            line = line.trim();
+            if (!line) return;
+
+            if (line === "[COLORS]") { mode = "COLORS"; return; } 
+            if (line === "[TEACHER_META]") { mode = "TEACHER_META"; return; }
+
+            if (mode === "COLORS") {
+                let parts = line.split('|').map(s => s.trim());
+                if(parts.length >= 2) newTeacherColors[parts[0]] = parts[1];
+
+            } else if (mode === "TEACHER_META") {
+                let parts = line.split('|').map(s => s.trim());
+                if(parts.length >= 2) {
+                    let t = parts[0];
+                    newTeacherColors[t] = parts[1];
+                    if(parts.length >= 3 && parts[2] !== "") {
+                        newTeacherAvailability[t] = parts[2].split(';');
+                    }
+                    if(parts.length >= 4) {
+                        newTeacherTextColors[t] = parts[3];
+                    } else {
+                        newTeacherTextColors[t] = 'black';
+                    }
+                }
+
+            } else if (mode === "COURSES") {
+                let parts = line.split('|').map(s => s.trim());
+                if (parts.length < 2) return; 
+
+                let name = parts[0];
+                let teacher = parts[1];
+                let timeRaw = parts[2]; 
+                
+                let gradesRaw = (parts.length >= 4) ? parts[3] : "";
+                let allowedGrades = [];
+                if (gradesRaw && gradesRaw !== "") {
+                    allowedGrades = gradesRaw.split(';').map(g => parseInt(g));
+                }
+                
+                let cType = (parts.length >= 5) ? parts[4] : "none";
+                let isInd = (parts.length >= 6) ? (parts[5] === "1") : false;
+                
+                let cSem = (parts.length >= 7) ? parseInt(parts[6]) : 3;
+                if(isNaN(cSem)) cSem = 3;
+
+                if (teacher === "校必修") {
+                    let timeSegments = timeRaw.split(';').map(s => s.trim()).filter(s => s !== "");
+                    let totalPeriods = 0;
+                    timeSegments.forEach(seg => {
+                        let match = seg.match(/^(\d+)\s+([^/]+)\/(.+)$/);
+                        if (match) {
+                            let pList = match[3].split(',').map(p => p.trim());
+                            totalPeriods += pList.length;
+                        }
+                    });
+
+                    let cId = Date.now() + Math.random().toString();
+                    newCourses.push({ 
+                        id: cId, name, teacher, periods: totalPeriods, isSplit: false, 
+                        allowedGrades, courseType: cType, isIndependent: true, isDeptReq: true, isLocked: true, semester: 3 
+                    });
+
+                    timeSegments.forEach(seg => {
+                        let match = seg.match(/^(\d+)\s+([^/]+)\/(.+)$/);
+                        if (match) {
+                            let grade = match[1];
+                            let dayStr = match[2];
+                            let periodsStr = match[3];
+                            let day = dayMapRev[dayStr];
+                            let pList = periodsStr.split(',').map(p => p.trim());
+                            if (day && grade) {
+                                pList.forEach(p => {
+                                    let key = `${day}-${grade}-${p}`;
+                                    if(!newSchedule[key]) newSchedule[key] = [];
+                                    newSchedule[key].push(cId);
+                                });
+                            }
+                        }
+                    });
+                    return; 
+                }
+
+                if (!timeRaw || timeRaw.trim() === "") {
+                    newCourses.push({ 
+                        id: Date.now() + Math.random().toString(), 
+                        name, teacher, periods: 3, isSplit: false, 
+                        allowedGrades, courseType: cType, isIndependent: isInd, semester: cSem
+                    });
+                    return;
+                }
+
+                let timeSegments = timeRaw.split(';').map(s => s.trim()).filter(s => s !== "");
+                
+                if (timeSegments.length > 1) {
+                    let parentId = Date.now() + Math.random().toString();
+                    timeSegments.forEach((seg, idx) => {
+                        let match = seg.match(/^(\d+)\s+([^/]+)\/(.+)$/);
+                        if (match) {
+                            let grade = match[1];
+                            let dayStr = match[2];
+                            let periodsStr = match[3];
+                            let day = dayMapRev[dayStr];
+                            let pList = periodsStr.split(',').map(p => p.trim());
+                            let cId = parentId + "_" + idx;
+                            
+                            newCourses.push({
+                                id: cId, parentId: parentId,
+                                name: name + `(${idx+1})`, teacher, 
+                                periods: pList.length, isSplit: true, 
+                                allowedGrades, courseType: cType, isIndependent: isInd, semester: cSem
+                            });
+                            if (day && grade) {
+                                pList.forEach(p => {
+                                    let key = `${day}-${grade}-${p}`;
+                                    if(!newSchedule[key]) newSchedule[key] = [];
+                                    newSchedule[key].push(cId);
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    let seg = timeSegments[0];
+                    let cId = Date.now() + Math.random().toString();
+                    let match = seg.match(/^(\d+)\s+([^/]+)\/(.+)$/);
+                    if (match) {
+                        let grade = match[1];
+                        let dayStr = match[2];
+                        let periodsStr = match[3];
+                        let day = dayMapRev[dayStr];
+                        let pList = periodsStr.split(',').map(p => p.trim());
+                        if (day && grade) {
+                            pList.forEach(p => {
+                                let key = `${day}-${grade}-${p}`;
+                                if(!newSchedule[key]) newSchedule[key] = [];
+                                newSchedule[key].push(cId);
+                            });
+                        }
+                        newCourses.push({ 
+                            id: cId, name, teacher, periods: pList.length, isSplit: false, 
+                            allowedGrades, courseType: cType, isIndependent: isInd, semester: cSem
+                        });
+                    }
+                }
+            }
+        });
+
+        newCourses.forEach(c => {
+            let isDeptReq = (c.teacher === "校必修");
+            if(isDeptReq) {
+                c.isDeptReq = true;
+                c.isLocked = true;
+            }
+            if(c.teacher !== "校必修" && !newTeacherColors[c.teacher]) {
+                newTeacherColors[c.teacher] = SOFT_COLORS[Object.keys(newTeacherColors).length % SOFT_COLORS.length];
+            }
+        });
+
+        courses = newCourses;
+        schedule = newSchedule;
+        teacherColors = newTeacherColors;
+        teacherTextColors = newTeacherTextColors;
+        teacherAvailability = newTeacherAvailability;
+        
+        save(); 
+        location.reload(); 
+    }
+
+    // Initialize UI state
+    window.addEventListener('load', () => {
+        checkUrlParams();
+        updateUIForMode(); 
+        
+        document.getElementById('showSat').checked = settings.sat; 
+        document.getElementById('showSun').checked = settings.sun;
+        [1,2,3,4].forEach(i => document.getElementById('g'+i).checked = settings.wd[i-1]);
+        
+        let curSem = settings.currentSemester || 1;
+        let semRadio = document.querySelector(`input[name="semView"][value="${curSem}"]`);
+        if(semRadio) semRadio.checked = true;
+    });
+
+    document.getElementById('mCredits').addEventListener('keypress', function (e) { if (e.key === 'Enter') addCourse(); });
+    window.addEventListener('resize', render);
 </script>
-
 </body>
 </html>
