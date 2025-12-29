@@ -180,7 +180,7 @@
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
                 支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
-                <strong>功能更新：</strong>移除英文畢業門檻檢核；保留體育與勞作教育門檻。
+                <strong>功能更新：</strong>系必修門檻已依據 PDF 修正 (111: 58, 112-114: 55)，並移除英文門檻。
             </div>
         </div>
     </div>
@@ -203,7 +203,7 @@
 
             <div class="dash-card" onclick="scrollToId('tbl-req')">
                 <div class="dash-title">系必修 <span id="reqStatus" class="dash-status status-ng">未完成</span></div>
-                <div class="dash-value"><span id="reqCred">0</span> <span style="font-size:16px; color:#999;">/ <span id="reqTarget">58</span></span></div>
+                <div class="dash-value"><span id="reqCred">0</span> <span style="font-size:16px; color:#999;">/ <span id="reqTarget">55</span></span></div>
                 <div class="dash-sub">已修門數: <span id="reqCount">0</span> / <span id="reqTotalCount">0</span></div>
             </div>
 
@@ -282,11 +282,12 @@
 </div>
 
 <script>
+    // 依據 PDF 修正必修學分 (扣除基礎課程14學分與通識12學分後)
     const CREDITS_TARGET = {
         "111": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "112": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "113": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
-        "114": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 }
+        "112": { basic: 14, req: 55, deptElec: 20, genEd: 12, total: 128 },
+        "113": { basic: 14, req: 55, deptElec: 20, genEd: 12, total: 128 },
+        "114": { basic: 14, req: 55, deptElec: 20, genEd: 12, total: 128 }
     };
 
     const BASE_BASIC_COURSES = [
@@ -323,7 +324,7 @@
     let courseDatabase = {}; 
 
     window.onload = async function() {
-        // 初始化時即呼叫一次更新UI，確保勾選框狀態正確
+        // 初始化時即呼叫一次更新UI
         updateThresholdUI();
         
         const dbStatus = document.getElementById('dbStatus');
