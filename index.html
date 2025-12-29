@@ -122,11 +122,77 @@
             text-align: center;
         }
 
+        #disclaimer-section {
+            margin-top: 40px;
+            padding: 20px;
+            background-color: #fff3cd;
+            border: 2px dashed #ffc107;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 16px;
+            color: #856404;
+            line-height: 1.6;
+        }
+        #disclaimer-section strong {
+            font-size: 18px;
+            color: #d32f2f;
+        }
+
+        /* 彈出視窗 (Modal) 樣式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 500px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            border-top: 8px solid var(--danger-color);
+            animation: modalFadeIn 0.3s;
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .modal-title {
+            font-size: 24px;
+            color: var(--danger-color);
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .modal-body {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+            margin-bottom: 25px;
+            text-align: left;
+        }
+        .modal-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .modal-btn:hover { background-color: #003366; }
+
         #admin-panel { display: none; background: #fff3cd; padding: 20px; border: 1px solid #ffeeba; margin-top: 30px; border-radius: 8px; }
         .hidden { display: none; }
 
         @media print {
-            .control-panel, .status-bar, .back-to-top, .btn, #admin-panel { display: none !important; }
+            .control-panel, .status-bar, .back-to-top, .btn, #admin-panel, .modal-overlay { display: none !important; }
             .container { box-shadow: none; padding: 0; width: 100%; max-width: 100%; }
             body { background: white; -webkit-print-color-adjust: exact; }
             .dash-card { border: 1px solid #999; break-inside: avoid; }
@@ -136,6 +202,7 @@
             table { page-break-inside: auto; }
             tr { page-break-inside: avoid; page-break-after: auto; }
             #missing-summary-panel { border: 2px solid #333; }
+            #disclaimer-section { display: block; border: 2px solid #000; margin-top: 50px; break-inside: avoid; }
         }
     </style>
 </head>
@@ -168,7 +235,7 @@
             <label>2. 上傳成績單 & 門檻確認</label>
             <div class="btn-group">
                 <input type="file" id="studentFile" accept=".xlsx, .xls, .csv" />
-                <button class="btn" onclick="processFileAndAnalyze()">開始分析</button>
+                <button class="btn" onclick="checkFileAndShowModal()">開始分析</button>
                 <button class="btn btn-outline" onclick="downloadTemplate()">📥 下載範例檔 (.xlsx)</button>
             </div>
             
@@ -180,7 +247,7 @@
 
             <div style="font-size: 12px; color: #666; margin-top: 8px;">
                 支援格式：.xlsx, .csv (系統會讀取檔名作為稱呼)。<br>
-                <strong>功能更新：</strong>系必修門檻已依據 PDF 修正 (111: 58, 112-114: 55)，並移除英文門檻。
+                <strong>功能更新：</strong>新增免責聲明確認視窗，確保使用前知悉規則。
             </div>
         </div>
     </div>
@@ -253,6 +320,12 @@
             <h3>📝 溫馨提醒：目前缺少項目總結</h3>
             <div id="missing-content"></div>
         </div>
+
+        <div id="disclaimer-section">
+            📢 <strong>畢業審查貼心提醒</strong>：<br>
+            本系統僅供「<strong>試算參考</strong>」，實際畢業資格請務必以 <strong>學校正式系統</strong> 與 <strong>系辦公告</strong> 為最終依據！<br>
+            畢業大事，請再三確認喔！💪 (By HC)
+        </div>
     </div>
 
     <div id="admin-panel">
@@ -281,8 +354,23 @@
     </div>
 </div>
 
+<div id="disclaimerModal" class="modal-overlay">
+    <div class="modal-box">
+        <div class="modal-title">⚠️ 重要免責聲明</div>
+        <div class="modal-body">
+            <p><strong>親愛的同學您好：</strong></p>
+            <p>本系統僅提供學分試算參考，<strong>並非學校正式審核結果</strong>。</p>
+            <ul style="padding-left: 20px; margin-top: 10px;">
+                <li>所有畢業門檻與必修規定，請務必以<strong>東海大學電機系系辦公告</strong>及<strong>校方正式畢業審查系統</strong>為準。</li>
+                <li>若系統顯示結果有誤或有疑慮，請自行至系辦公室再次核對。</li>
+            </ul>
+            <p style="margin-top: 15px; color: #d32f2f; font-weight: bold;">使用本系統即代表您已知悉上述聲明，並願意自行承擔核對責任。</p>
+        </div>
+        <button class="modal-btn" onclick="executeAnalysis()">我瞭解了，開始分析 🚀</button>
+    </div>
+</div>
+
 <script>
-    // 依據 PDF 修正必修學分 (扣除基礎課程14學分與通識12學分後)
     const CREDITS_TARGET = {
         "111": { basic: 14, req: 58, deptElec: 20, genEd: 12, total: 128 },
         "112": { basic: 14, req: 55, deptElec: 20, genEd: 12, total: 128 },
@@ -324,7 +412,6 @@
     let courseDatabase = {}; 
 
     window.onload = async function() {
-        // 初始化時即呼叫一次更新UI
         updateThresholdUI();
         
         const dbStatus = document.getElementById('dbStatus');
@@ -365,7 +452,6 @@
         }
     }
 
-    // 獨立的門檻 UI 更新函數 (不依賴 analyze)
     function updateThresholdUI() {
         const peOk = document.getElementById('chkPE').checked;
         const laborOk = document.getElementById('chkLabor').checked;
@@ -394,11 +480,25 @@
         XLSX.writeFile(wb, "成績單範例.xlsx");
     }
 
-    function processFileAndAnalyze() {
+    // 新增：檢查檔案並顯示彈窗
+    function checkFileAndShowModal() {
         const fileInput = document.getElementById('studentFile');
         const file = fileInput.files[0];
         if (!file) { alert("請先選擇檔案！"); return; }
+        
+        // 顯示彈窗
+        document.getElementById('disclaimerModal').style.display = 'flex';
+    }
 
+    // 新增：執行分析 (按下彈窗確認後觸發)
+    function executeAnalysis() {
+        // 隱藏彈窗
+        document.getElementById('disclaimerModal').style.display = 'none';
+        
+        // 執行原本的讀取邏輯
+        const fileInput = document.getElementById('studentFile');
+        const file = fileInput.files[0];
+        
         const fileName = file.name.split('.')[0]; 
         const greetingEl = document.getElementById('greetingDisplay');
         greetingEl.innerText = `👋 ${fileName} 你好`;
@@ -420,6 +520,11 @@
             }
         };
         reader.readAsArrayBuffer(file); 
+    }
+
+    // 舊的 processFileAndAnalyze 已經被拆解到 checkFileAndShowModal 和 executeAnalysis，保留空殼防止報錯
+    function processFileAndAnalyze() {
+        checkFileAndShowModal();
     }
 
     function normalizeData(jsonData) {
@@ -465,7 +570,6 @@
     function isSameName(sName, rName) { return normalizeName(sName) === normalizeName(rName); }
     function isBasicCourse(name, list) { return list.some(b => normalizeName(name).includes(normalizeName(b))); }
     
-    // 嚴格前綴判定
     function isGeneralEd(name) {
         const n = normalizeName(name); 
         const strictPrefixes = [
@@ -483,7 +587,6 @@
     }
 
     function analyze() {
-        // 先確保門檻 UI 狀態是新的
         updateThresholdUI();
 
         if (parsedStudentData.length === 0) return alert("讀取到的資料為空。");
@@ -613,7 +716,6 @@
         document.getElementById('totalCred').innerText = stats.total;
         document.getElementById('genElecCred').innerText = stats.genElec.cred;
         
-        // 呼叫一次門檻更新，確保這裡也是同步的
         updateThresholdUI();
     }
 
